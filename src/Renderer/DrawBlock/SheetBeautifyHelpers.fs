@@ -3,6 +3,7 @@ open DrawModelType
 open DrawModelType.SymbolT
 open Optics
 open CommonTypes
+open Symbol
 
 //-----------------Module for beautify Helper functions--------------------------//
 // Typical candidates: all individual code library functions.
@@ -94,7 +95,15 @@ let reversedInputPortsLens_ = Lens.create reversedInputPortsGetter reversedInput
 
 
 (*B5*)
-    
+
+
+let getPortPosOnSheet (symbol : SymbolT.Symbol) (portName : Port) : XYPos=
+    // get the offset of port relative to topleft pos of symbol
+    let offset = getPortPos symbol portName
+    // add the offset to the Pos of the symbol, you need operator overloading for this, open Operators maybe
+    symbol.Pos + offset
+
+
 
 
 
