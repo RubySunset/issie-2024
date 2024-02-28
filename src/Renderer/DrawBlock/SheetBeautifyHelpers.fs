@@ -78,9 +78,22 @@ let symbolEdgePortOrderSetter (newOrder : list<string>) (side : Edge) (symbol : 
 
 // not possible to make a lens for this using Lens.create
 // I can make a custom lens where getter would be 'a -> 'b -> 'c and the setter would be 'c -> 'b -> 'a -> 'a but it would be bad practice
- 
 
 
+(* B4 *)
+
+let reversedInputPortsGetter (symbol : SymbolT.Symbol) : option<bool> = 
+    symbol.ReversedInputPorts
+
+let reversedInputPortsSetter (reversed : option<bool>) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
+    { symbol with ReversedInputPorts = reversed }
+
+// make the lens for this 
+let reversedInputPortsLens_ = Lens.create reversedInputPortsGetter reversedInputPortsSetter
+
+
+
+(*B5*)
     
 
 
