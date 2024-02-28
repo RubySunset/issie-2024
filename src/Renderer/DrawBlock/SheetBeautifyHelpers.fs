@@ -4,6 +4,7 @@ open DrawModelType.SymbolT
 open Optics
 open CommonTypes
 open Symbol
+open RotateScale
 
 //-----------------Module for beautify Helper functions--------------------------//
 // Typical candidates: all individual code library functions.
@@ -104,7 +105,44 @@ let getPortPosOnSheet (symbol : SymbolT.Symbol) (portName : Port) : XYPos=
     symbol.Pos + offset
 
 
+(*B6*)
 
+let getBoundingBox (symbol : SymbolT.Symbol) = 
+    {TopLeft = symbol.LabelBoundingBox.TopLeft ; W = symbol.LabelBoundingBox.W ; H = symbol.LabelBoundingBox.H}
+    // or just do this 
+    //getSymbolBoundingBox symbol
+    // or
+    //symbol |> fst labelBoundingBox_
+
+
+(*B7*)
+
+let rotationStateOfSymbolGetter (symbol : SymbolT.Symbol) : Rotation = 
+    symbol.STransform.Rotation
+
+let rotationStateOfSymbolSetter (rotationState : Rotation) (symbol : SymbolT.Symbol) = 
+    { symbol with STransform = {symbol.STransform with Rotation = rotationState} }
+    // or 
+    // rotateSymbolInBlock rotationState symbol.CentrePos symbol
+
+// make the lens for this
+let rotationStateOfSymbolLens_ = Lens.create rotationStateOfSymbolGetter rotationStateOfSymbolSetter
+
+(*B8*)
+
+let flipStateOfSymbolGetter (symbol : SymbolT.Symbol) : bool = 
+    symbol.STransform.Flipped
+
+let flipStateOfSymbolSetter (flipState : bool) (symbol : SymbolT.Symbol) = 
+    { symbol with STransform = {symbol.STransform with Flipped = flipState} }
+    // or
+    // flipSymbolInBlock flipState symbol.CentrePos symbol
+
+// make lens for this
+let flipStateOfSymbolLens_ = Lens.create flipStateOfSymbolGetter flipStateOfSymbolSetter
+
+
+    
 
 
     
