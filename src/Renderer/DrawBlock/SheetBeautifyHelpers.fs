@@ -3,6 +3,8 @@
 open CommonTypes
 open DrawModelType
 
+open DrawModelType.BusWireT
+open Electron
 open Symbol
 open BlockHelpers
 
@@ -10,8 +12,15 @@ open BlockHelpers
 // Typical candidates: all individual code library functions.
 // Other helpers identified by Team
 module Helpers =
+    let strictOverlap1D ((a1, a2): float * float) ((b1, b2): float * float) : bool =
+        let a_min, a_max = min a1 a2, max a1 a2
+        let b_min, b_max = min b1 b2, max b1 b2
+        a_max > b_min && b_max > a_min
+    let strictOverlap2D ((a1, a2): XYPos * XYPos) ((b1, b2): XYPos * XYPos) : bool =
+        (strictOverlap1D (a1.X, a2.X) (b1.X, b2.X)) && (strictOverlap1D (a1.Y, a2.Y) (b1.Y, b2.Y))
 
-    let getWiresInBox (model: SheetT.Model) (box: BoundingBox)  : (BusWireT.Wire * int) list =
+
+    let strictGetWiresInBox (model: SheetT.Model) (box: BoundingBox)  : (Wire * int) list =
         let wires = (List.ofSeq (Map.values model.Wire.Wires))
 
         let bottomRight =
@@ -20,9 +29,9 @@ module Helpers =
             }
 
         // State Tuple - (overlapping: bool, overlapping_wire_index: int)
-        let checkOverlapFolder (startPos: XYPos) (endPos: XYPos) (state: bool * int) (segment: BusWireT.Segment) : bool * int =
-            let overlap = overlap2D (startPos, endPos) (box.TopLeft, bottomRight)
-            (fst state || overlap), if overlap then segment.Index else snd state
+        let checkOverlapFolder (startPos: XYPos) (endPos: XYPos) (state: bool * int) (segment: Segment) : bool * int =
+            let strictOverlap = strictOverlap2D (startPos, endPos) (box.TopLeft, bottomRight)
+            (fst state || strictOverlap), if strictOverlap then segment.Index else snd state
 
         List.map (fun w -> foldOverNonZeroSegs checkOverlapFolder (false, -1) w, w) wires
         |> List.filter (fun l -> fst (fst l))
@@ -36,13 +45,26 @@ module Helpers =
                 | _ -> IsOdd
 
             match index, wire.InitialOrientation with
-            | IsEven, BusWireT.Vertical | IsOdd, BusWireT.Horizontal -> {X=0.; Y=wire.Segments[index].Length}
-            | IsEven, BusWireT.Horizontal | IsOdd, BusWireT.Vertical -> {X=wire.Segments[index].Length; Y=0.}
+            | IsEven, Vertical | IsOdd, Horizontal -> {X=0.; Y=wire.Segments[index].Length}
+            | IsEven, Horizontal | IsOdd, Vertical -> {X=wire.Segments[index].Length; Y=0.}
+
+
+    ///index elements of a list
+    let indexList (list :List<'T>) =  List.mapi (fun i list_element ->(i,list_element)) list
+    ///form distinct pairs from a single list and ensures the same element is not combined with itself
+    let distinctPairs (l1:List<'T>)=
+        let l1Indexed = indexList l1
+        let l2Indexed = indexList l1
+        List.allPairs l1Indexed l2Indexed
+        |>List.filter( fun ((i1,l1e),(i2,l2e))->  i1<>i2 )
+        |>List.map ( fun ((i1,l1e),(i2,l2e))->  if i1<i2 then (i1,l1e),(i2,l2e) else (i2,l2e),(i1,l1e))
+        |>List.distinct
+        |>List.map (fun ((i1,l1e),(i2,l2e))-> (l1e,l2e) )
 
 
 module B1 =
     let B1R (symbol : SymbolT.Symbol) = (symbol.Component.H,symbol.Component.W)
-    let B1W (symbol:SymbolT.Symbol) (H:float) (W:float) = {symbol with SymbolT.Symbol.Component.H = H ; SymbolT.Symbol.Component.W =W}
+    let B1W (symbol:SymbolT.Symbol) (H:float) (W:float) = setCustomCompHW H W symbol
 
 
 module B2 =
@@ -83,32 +105,25 @@ module B8 =
 
 module T1 =
 
+    open Helpers
     let T1R (sheet :SheetT.Model) =
-        let boundingBoxIndexed =
+        let boundingBoxes =
             Map.values sheet.BoundingBoxes
             |> Seq.toList
-            |> List.mapi (fun i bb -> (i, bb))
-
-        List.allPairs boundingBoxIndexed boundingBoxIndexed
-        |> List.filter (fun ((i1,bb1), (i2,bb2)) -> ((overlap2DBox bb1 bb2) && i1<>i2))
-        |>List.map (fun ((i1, bb1), (i2, bb2)) -> if i1 < i2 then (i1, i2) else (i2, i1))
-        |>List.distinct
+        distinctPairs boundingBoxes
+        |> List.filter (fun (bb1,bb2) ->overlap2DBox bb1 bb2)
         |>List.length
 
 
 module T2 =
     open Helpers
-    let T2R (sheet:SheetT.Model) =
-        let boundingBoxes =
-            sheet.BoundingBoxes
-            |> Map.values
-            |> Seq.toList
 
-        boundingBoxes
-        |> List.collect (getWiresInBox sheet)
+    let T2R (sheet:SheetT.Model) =
+        sheet.BoundingBoxes
+        |> Map.values
+        |> Seq.toList
+        |> List.collect (strictGetWiresInBox sheet)
         |> List.distinct
-        |> List.map (fun (busWires, idx) -> getSegmentVector busWires idx)
-        |> List.filter (fun pos -> not (pos=~XYPos.zero))
         |>List.length
 
 
@@ -116,7 +131,34 @@ module T2 =
 module T3 =
 
 
+    open Helpers
     let T3R (sheet :SheetT.Model)=
+        //Returns true if any portion of the segments are Perpendicular
+        let segmentsFilter (segment1 : List<ASegment>) (segment2 : List<ASegment>)=
+            List.allPairs segment1 segment2
+
+
+//overlap 1d , portid same --> cross otherwise Ts and crosses
+        let wires =
+            sheet.Wire.Wires
+            |>Map.values
+            |>Seq.toList
+
+        distinctPairs wires
+        |>
+
+
+module T5 =
+
+
+    open Helpers
+    let T5R (sheet :SheetT.Model)=
+
+
+
+
+
+
 
 
 
