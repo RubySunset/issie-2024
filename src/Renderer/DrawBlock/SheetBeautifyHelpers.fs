@@ -5,6 +5,7 @@ open DrawModelType
 
 open DrawModelType.BusWireT
 open Electron
+open Optics.Compose
 open Symbol
 open BlockHelpers
 
@@ -68,8 +69,10 @@ module B1 =
 
 
 module B2 =
+
     let B2W (symbol : SymbolT.Symbol) (x:float) (y:float) =
-        {symbol with Pos.X =x ;Pos.Y  = y }
+        { symbol with Pos = { symbol.Pos with X = x; Y = y } }
+
 
 module B3 =
 
@@ -77,7 +80,14 @@ module B3 =
 
     let B3W (symbol:SymbolT.Symbol) (edge : Edge) (ports : List<string>) =
 
-        {symbol with PortMaps.Order= Map.add edge ports symbol.PortMaps.Order }
+
+        { symbol with
+            PortMaps =
+                { symbol.PortMaps with
+                    Order = Map.add edge ports symbol.PortMaps.Order
+                }
+        }
+
 
 module B4 =
     let B4R (symbol :SymbolT.Symbol) = symbol.ReversedInputPorts
@@ -127,32 +137,6 @@ module T2 =
         |>List.length
 
 
-
-module T3 =
-
-
-    open Helpers
-    let T3R (sheet :SheetT.Model)=
-        //Returns true if any portion of the segments are Perpendicular
-        let segmentsFilter (segment1 : List<ASegment>) (segment2 : List<ASegment>)=
-            List.allPairs segment1 segment2
-
-
-//overlap 1d , portid same --> cross otherwise Ts and crosses
-        let wires =
-            sheet.Wire.Wires
-            |>Map.values
-            |>Seq.toList
-
-        distinctPairs wires
-        |>
-
-
-module T5 =
-
-
-    open Helpers
-    let T5R (sheet :SheetT.Model)=
 
 
 
