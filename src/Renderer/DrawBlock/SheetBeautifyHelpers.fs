@@ -5,6 +5,8 @@ open Optics
 open CommonTypes
 open Symbol
 open RotateScale
+open SymbolHelpers
+open BlockHelpers
 
 //-----------------Module for beautify Helper functions--------------------------//
 // Typical candidates: all individual code library functions.
@@ -12,42 +14,44 @@ open RotateScale
 
 
 (*   B1: Functions to get and set the dimensions of a custom component   *)
+// check these later
+/// TODO: for this check if you will need to use the function from SymbolHelpers.fs using getCustomSymCorners
+/// TODO: or use getRotatedHAndW
+
 
 // this returns a tuple in the conventional mathematical manner assuming width corresponds to x and height corresponds to y
 let cusotmCompDimGetter (customSymbol : SymbolT.Symbol) : (float * float) = 
-    // Assuming there will be no need to check if the component is a custom symbol
-    let width = customSymbol.LabelBoundingBox.W
-    let height = customSymbol.LabelBoundingBox.H
-    (width, height)
-    // alternative method using the provided lens
-    // get the custom box using lens
-    // let customBox = 
-    //     customSymbol
-    //     |> fst labelBoundingBox_
-    // (customBox.W, customBox.H)
+    // get the dimentions of a custom symbol considering any rotationa and scaling
+    let dims = (getCustomSymCorners customSymbol)[2]
+    (dims.X, dims.Y)
+    
+    
 
 
-
-// reminder function signature for a setter in lens is 'b -> 'a -> 'a not 'a -> 'b -> 'a, this caused a bug in the code when making the lens
-// new dimensions passed as a 2-tuple to match the getter for making the lens
-// again assuming width is for x dimension and height is for y dimension
-let customCompDimSetter ( width : float , height : float ) (customSymbol : SymbolT.Symbol) : SymbolT.Symbol = 
-    { customSymbol with LabelBoundingBox = { customSymbol.LabelBoundingBox with W = width; H = height}}
-
-    // alternative method using the provided lens
-    // let currBox = customSymbol |> fst labelBoundingBox_
-    // let newBox = {currBox with W = width; H = height}
-    // (newBox, customSymbol) ||> snd labelBoundingBox_
+// TODO: check from the BlockHelper.fs if you can use setCustomCompHW
+let customCompDimSetter ( width : float , height : float ) (customSymbol : SymbolT.Symbol) = 
+    setCustomCompHW height width customSymbol
 
 // make a lens for the custom component dimensions
 let customCompDimLens_ = Lens.create cusotmCompDimGetter customCompDimSetter
 
 
+
+
+
+
+
 (* B2W *)
 // using the provided lens to set the position of a symbol
+// maybe use the function from line 329 of SymbolUpdate.fs
 let symbolPosSetter (newPos : XYPos) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
     let getSetter = snd posOfSym_
     getSetter newPos symbol
+
+
+
+
+
 
 
 (* B3 *)
@@ -82,6 +86,12 @@ let symbolEdgePortOrderSetter (newOrder : list<string>) (side : Edge) (symbol : 
 // I can make a custom lens where getter would be 'a -> 'b -> 'c and the setter would be 'c -> 'b -> 'a -> 'a but it would be bad practice
 
 
+
+
+
+
+
+
 (* B4 *)
 
 let reversedInputPortsGetter (symbol : SymbolT.Symbol) : option<bool> = 
@@ -95,6 +105,11 @@ let reversedInputPortsLens_ = Lens.create reversedInputPortsGetter reversedInput
 
 
 
+
+
+
+
+
 (*B5*)
 
 
@@ -103,6 +118,10 @@ let getPortPosOnSheet (symbol : SymbolT.Symbol) (portName : Port) : XYPos=
     let offset = getPortPos symbol portName
     // add the offset to the Pos of the symbol, you need operator overloading for this, open Operators maybe
     symbol.Pos + offset
+
+
+
+
 
 
 (*B6*)
@@ -115,8 +134,13 @@ let getBoundingBox (symbol : SymbolT.Symbol) =
     //symbol |> fst labelBoundingBox_
 
 
-(*B7*)
 
+
+
+
+
+(*B7*)
+// maybe use the function in line 477 from RotateScale.fs
 let rotationStateOfSymbolGetter (symbol : SymbolT.Symbol) : Rotation = 
     symbol.STransform.Rotation
 
@@ -127,6 +151,12 @@ let rotationStateOfSymbolSetter (rotationState : Rotation) (symbol : SymbolT.Sym
 
 // make the lens for this
 let rotationStateOfSymbolLens_ = Lens.create rotationStateOfSymbolGetter rotationStateOfSymbolSetter
+
+
+
+
+
+
 
 (*B8*)
 
