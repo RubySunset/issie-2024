@@ -7,10 +7,17 @@ open Symbol
 open RotateScale
 open SymbolHelpers
 open BlockHelpers
+open SymbolUpdate
 
 //-----------------Module for beautify Helper functions--------------------------//
 // Typical candidates: all individual code library functions.
 // Other helpers identified by Team
+
+// IMPORTANT NOTE:
+// Functions used for B1-B8 are only used to get and set fields of symbols and not update them in the sheet 
+// as there are functions in the codebase already that do the updating of the symbols in the sheet and using them here 
+// is redundant and unnecessary. This confusion was clarified by me asking the question on ed #229.
+// Update sheet fucntions already are there and can be used later to update the bounding boxes, etc later if needed.
 
 
 (*   B1: Functions to get and set the dimensions of a custom component   *)
@@ -23,15 +30,19 @@ open BlockHelpers
 // this returns a tuple in the conventional mathematical manner assuming width corresponds to x and height corresponds to y
 let cusotmCompDimGetter (customSymbol : SymbolT.Symbol) : (float * float) = 
     // get the dimentions of a custom symbol considering any rotationa and scaling
-    let dims = (getCustomSymCorners customSymbol)[2]
-    (dims.X, dims.Y)
+    // let dims = (getCustomSymCorners customSymbol)[2]
+    // (dims.X, dims.Y)
+    let width = customSymbol.Component.W
+    let height = customSymbol.Component.H
+    width , height
     
     
 
 
 // TODO: check from the BlockHelper.fs if you can use setCustomCompHW
 let customCompDimSetter ( width : float , height : float ) (customSymbol : SymbolT.Symbol) = 
-    setCustomCompHW height width customSymbol
+    // setCustomCompHW height width customSymbol
+    { customSymbol with Component = {customSymbol.Component with W = width; H = height} }
 
 // make a lens for the custom component dimensions
 // lens gets ad sets dimensions as a tuple where first element is width(in x direction/horizontal dim) and second is height(in y direction/vertical dim)
@@ -51,8 +62,9 @@ let customCompDimLens_ = Lens.create cusotmCompDimGetter customCompDimSetter
 // maybe use moveSymbol in block helpers
 // or use moveSymbols
 let symbolPosSetter (newPos : XYPos) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
-    let offset = newPos - symbol.Pos
-    moveSymbol offset symbol
+    // let offset = newPos - symbol.Pos
+    // moveSymbol offset symbol
+    { symbol with Pos = newPos }
 
 
 
@@ -99,15 +111,44 @@ let symbolEdgePortOrderSetter (newOrder : list<string>) (side : Edge) (symbol : 
 
 
 (* B4 *)
+// The reverses state of the inputs of a MUX2
+// check the code from line 652 from SymbolUpdate.fs
 
-let reversedInputPortsGetter (symbol : SymbolT.Symbol) : option<bool> = 
-    symbol.ReversedInputPorts
+// for this maybe just return the boolean instead of the option
+// this should be implemented for all MUXs and DEMUXs
+// check which components use this field
+// for old circuits it will be read as NONE
+// for new circuits it will be Some thing
+// maybe for old circuits just set it to false
+// dealing with the None cases: it shoudl be same as the normal state for the added featrue which is False
 
-let reversedInputPortsSetter (reversed : option<bool>) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
-    { symbol with ReversedInputPorts = reversed }
+let MuxDemuxReversedInputPortsGetter (symbol : SymbolT.Symbol) : bool = 
+    let MuxDemuxLst = [Mux2; Mux4; Mux8; Demux2; Demux4; Demux8]
+    let isMuxOrDemux = List.exists (fun x -> x = symbol.Component.Type) MuxDemuxLst
 
-// make the lens for this 
-let reversedInputPortsLens_ = Lens.create reversedInputPortsGetter reversedInputPortsSetter
+    match symbol.ReversedInputPorts with
+    // for the old circuits where this field is not present hence return the normal state which is considered to be false according to ed stem posts
+    // | None when isMuxOrDemux -> false
+    | Some state when isMuxOrDemux -> state
+    // for components that are not Mux or Demux, return false since they don't have this field or it is already set to false
+    // referencing to Symbol.fs lines 707 and 622
+    | _ -> false    
+
+
+
+
+let MuxDemuxReversedInputPortsSetter (state : bool) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
+    // { symbol with ReversedInputPorts = reversed }
+    let MuxDemuxLst = [Mux2; Mux4; Mux8; Demux2; Demux4; Demux8]
+    let isMuxOrDemux = List.exists (fun x -> x = symbol.Component.Type) MuxDemuxLst
+    match isMuxOrDemux with
+    | true -> { symbol with ReversedInputPorts = Some state }
+    // not changing the field if the symbol is not a MUX or DEMUX since the symbol boolean is only used for MUX and DEMUX (ed stem #143)
+    | false -> symbol
+
+
+// NOTE: LENS SHOULD ONLY BE USED FOR MUX AND DEMUX COMPONENTS ACCORDING TO SPECIFICATION BUT OTHER CASES HAVE BEEN HANDLED
+let MuxDemuxReversedInputPortsLens_ = Lens.create MuxDemuxReversedInputPortsGetter MuxDemuxReversedInputPortsSetter
 
 
 
@@ -117,11 +158,11 @@ let reversedInputPortsLens_ = Lens.create reversedInputPortsGetter reversedInput
 
 
 (*B5*)
+// The position of a port on the sheet. It cannot directly be written.
 
-
-let getPortPosOnSheet (symbol : SymbolT.Symbol) (portName : Port) : XYPos=
+let getPortPosOnSheet (symbol : SymbolT.Symbol) (port : Port) : XYPos=
     // get the offset of port relative to topleft pos of symbol
-    let offset = getPortPos symbol portName
+    let offset = getPortPos symbol port
     // add the offset to the Pos of the symbol, you need operator overloading for this, open Operators maybe
     symbol.Pos + offset
 
@@ -132,12 +173,11 @@ let getPortPosOnSheet (symbol : SymbolT.Symbol) (portName : Port) : XYPos=
 
 (*B6*)
 
+/// check Symbol.fs line 124 for function getSymbolBoundingBox
+
+
 let getBoundingBox (symbol : SymbolT.Symbol) = 
-    {TopLeft = symbol.LabelBoundingBox.TopLeft ; W = symbol.LabelBoundingBox.W ; H = symbol.LabelBoundingBox.H}
-    // or just do this 
-    //getSymbolBoundingBox symbol
-    // or
-    //symbol |> fst labelBoundingBox_
+    getSymbolBoundingBox symbol
 
 
 
@@ -146,14 +186,35 @@ let getBoundingBox (symbol : SymbolT.Symbol) =
 
 
 (*B7*)
+// The rotation state of a symbol RW
+
+let getSTransform (symbol : SymbolT.Symbol) = 
+    symbol.STransform
+
+let setSTransform (sTransform : STransform) (symbol : SymbolT.Symbol) = 
+    { symbol with STransform = sTransform }
+
+let sTransformLens_ = Lens.create getSTransform setSTransform
+
+let getRotation (sTransform : STransform) = 
+    sTransform.Rotation
+
+let setRotation (rotation : Rotation) (sTransform : STransform) = 
+    { sTransform with Rotation = rotation }
+
+let rotationLens_ = Lens.create getRotation setRotation
+
 // maybe use the function in line 477 from RotateScale.fs
 let rotationStateOfSymbolGetter (symbol : SymbolT.Symbol) : Rotation = 
-    symbol.STransform.Rotation
+    // symbol.STransform.Rotation
+    symbol |> fst sTransformLens_ |> fst rotationLens_
 
-let rotationStateOfSymbolSetter (rotationState : Rotation) (symbol : SymbolT.Symbol) = 
-    { symbol with STransform = {symbol.STransform with Rotation = rotationState} }
-    // or 
-    // rotateSymbolInBlock rotationState symbol.CentrePos symbol
+let rotationStateOfSymbolSetter (rotationState : Rotation) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
+    //{ symbol with STransform = {symbol.STransform with Rotation = rotationState} }
+    // rotateSymbolByDegree rotationState symbol
+    let oldSTransform = symbol |> fst sTransformLens_
+    let newSTransform = (rotationState, oldSTransform) ||> snd rotationLens_
+    (newSTransform, symbol) ||> snd sTransformLens_
 
 // make the lens for this
 let rotationStateOfSymbolLens_ = Lens.create rotationStateOfSymbolGetter rotationStateOfSymbolSetter
@@ -166,13 +227,24 @@ let rotationStateOfSymbolLens_ = Lens.create rotationStateOfSymbolGetter rotatio
 
 (*B8*)
 
+let getFlipState (sTransform : STransform) = 
+    sTransform.Flipped
+
+let setFlipState (flipState : bool) (sTransform : STransform) = 
+    { sTransform with Flipped = flipState }
+
+let flipStateLens_ = Lens.create getFlipState setFlipState
+
 let flipStateOfSymbolGetter (symbol : SymbolT.Symbol) : bool = 
-    symbol.STransform.Flipped
+    symbol |> fst sTransformLens_ |> fst flipStateLens_
 
 let flipStateOfSymbolSetter (flipState : bool) (symbol : SymbolT.Symbol) = 
-    { symbol with STransform = {symbol.STransform with Flipped = flipState} }
+    // { symbol with STransform = {symbol.STransform with Flipped = flipState} }
     // or
     // flipSymbolInBlock flipState symbol.CentrePos symbol
+    let oldSTransform = symbol |> fst sTransformLens_
+    let newSTransform = (flipState, oldSTransform) ||> snd flipStateLens_
+    (newSTransform, symbol) ||> snd sTransformLens_
 
 // make lens for this
 let flipStateOfSymbolLens_ = Lens.create flipStateOfSymbolGetter flipStateOfSymbolSetter
