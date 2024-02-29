@@ -250,6 +250,46 @@ let flipStateOfSymbolSetter (flipState : bool) (symbol : SymbolT.Symbol) =
 let flipStateOfSymbolLens_ = Lens.create flipStateOfSymbolGetter flipStateOfSymbolSetter
 
 
+
+
+
+
+(*T FUCNTIONS BEGIN*)
+
+// T1R : The number of pairs of symbols that intersect each other. See Tick3 for a related
+// function. Count over all pairs of symbols.
+
+// helpers:
+
+// this fucntion creates a list of par of elements from list that dont have repeated elements (a, a) and dont have mirrored pairs (a, b) and (b, a)
+let createPairs list =
+    let indexedList = List.mapi (fun index value -> (index, value)) list
+    let allPairs = 
+        List.collect (fun (index1, value1) -> 
+            List.choose (fun (index2, value2) -> 
+                if index1 < index2 then Some (value1, value2) else None) indexedList) indexedList
+    allPairs
+
+let PairsOfIntersectingBoxes (model : SheetT.Model) : int = 
+    let boundingBoxesMap = model.BoundingBoxes
+    let lstOfBB = boundingBoxesMap |> Map.toSeq |> Seq.map snd |> Seq.toList
+    let pairsOfBB = createPairs lstOfBB
+    pairsOfBB |> List.filter (fun (x, y) -> overlap2DBox x y) |> List.length
+
+
+
+(*T2*)
+
+// The number of distinct wire visible segments that intersect with one or more
+// symbols. See Tick3.HLPTick3.visibleSegments for a helper. Count over all visible wire
+// segments.
+
+// use getWire function from BlockHelpers.fs
+
+
+
+
+
     
 
 
