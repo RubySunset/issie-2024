@@ -134,7 +134,7 @@ module B1 =
 module B2 =
 
     let B2W (symbol : SymbolT.Symbol) (x:float) (y:float) =
-        { symbol with Pos = { symbol.Pos with X = x; Y = y } }
+        { symbol with Pos = {  X = x; Y = y } }
 
 
 module B3 =
@@ -262,8 +262,10 @@ module T5 =
 
         let visibleHorizontalSegments,visibleVerticalSegments =getVisibleASegments allASegments
         List.allPairs visibleHorizontalSegments visibleVerticalSegments
-        |>List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y))
+        |>List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y) && (sameNet sheet verticalSegment horizontalSegment))
         |>List.length
+
+
 
 
 
