@@ -17,6 +17,7 @@ open BlockHelpers
 // check these later
 /// TODO: for this check if you will need to use the function from SymbolHelpers.fs using getCustomSymCorners
 /// TODO: or use getRotatedHAndW
+/// TODO: if have mroe time maybe implement the getter and setter for dimentions seperately
 
 
 // this returns a tuple in the conventional mathematical manner assuming width corresponds to x and height corresponds to y
@@ -33,6 +34,7 @@ let customCompDimSetter ( width : float , height : float ) (customSymbol : Symbo
     setCustomCompHW height width customSymbol
 
 // make a lens for the custom component dimensions
+// lens gets ad sets dimensions as a tuple where first element is width(in x direction/horizontal dim) and second is height(in y direction/vertical dim)
 let customCompDimLens_ = Lens.create cusotmCompDimGetter customCompDimSetter
 
 
@@ -42,11 +44,15 @@ let customCompDimLens_ = Lens.create cusotmCompDimGetter customCompDimSetter
 
 
 (* B2W *)
+// updating the position of a symbol given new position 
 // using the provided lens to set the position of a symbol
+
 // maybe use the function from line 329 of SymbolUpdate.fs
+// maybe use moveSymbol in block helpers
+// or use moveSymbols
 let symbolPosSetter (newPos : XYPos) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
-    let getSetter = snd posOfSym_
-    getSetter newPos symbol
+    let offset = newPos - symbol.Pos
+    moveSymbol offset symbol
 
 
 
@@ -56,17 +62,21 @@ let symbolPosSetter (newPos : XYPos) (symbol : SymbolT.Symbol) : SymbolT.Symbol 
 
 (* B3 *)
 
+// Read/write the order of ports on a specified side of a symbol
+
 // getter function for the order of ports on a specific side of a symbol
 let symbolEdgePortOrderGetter (symbol : SymbolT.Symbol) (side : Edge) : list<string> = 
-    // get port maps using a lens
-    let portsMap = symbol |> fst portMaps_
-    // get order field of the ports map
-    let order = portsMap |> fst order_
-    // return the list of ports on the given side in correct order
+    // get portmaps of thhe symbol
+    let portMaps = symbol |> fst portMaps_
+    // get order field of portMaps
+    let order = portMaps |> fst order_
+    // return the list of ports in order on the given side in correct order
     order[side]
 
     // could do all in one line maybe less readable
     //symbol.PortMaps.Order[side]
+
+
 
 // setter function for the order of ports on a specific side of a symbol
 let symbolEdgePortOrderSetter (newOrder : list<string>) (side : Edge) (symbol : SymbolT.Symbol) : SymbolT.Symbol = 
@@ -81,10 +91,6 @@ let symbolEdgePortOrderSetter (newOrder : list<string>) (side : Edge) (symbol : 
 
     // could do all in one line maybe less readable
     // {symbol with PortMaps = {symbol.PortMaps with Order = Map.add side newOrder symbol.PortMaps.Order}}
-
-// not possible to make a lens for this using Lens.create
-// I can make a custom lens where getter would be 'a -> 'b -> 'c and the setter would be 'c -> 'b -> 'a -> 'a but it would be bad practice
-
 
 
 
