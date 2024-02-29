@@ -30,7 +30,8 @@ module IndividualPhaseWork =
     // Although a little more verbose if wanting to get both
     // e.g. let h, w = Optic.get customCompH_ symbol, Optic.get customCompW_ symbol
 
-    /// Lens for the height (H) dimension of Symbol.Component
+    /// Lens for the height of a symbol component
+    /// ```(Symbol.Component.H)```
     ///
     /// Get Example:
     /// ```
@@ -42,14 +43,15 @@ module IndividualPhaseWork =
     /// |> Optic.set customCompH_ h
     /// |> Optic.set customCompW_ w
     /// ```
-    let customCompH_ = component_ >-> h_
+    let symCompH_ = component_ >-> h_
         // let optic = component_ >-> h_
         // Lens.create
         //     // (fun symbol -> symbol.Component.H)
         //     (fun symbol -> Optic.get optic symbol)
         //     (fun h symbol -> Optic.set optic h symbol)
 
-    /// Lens for the width (W) dimension of Symbol.Component
+    /// Lens for the width of a symbol component
+    /// ```(Symbol.Component.W)```
     ///
     /// Get Example:
     /// ```
@@ -61,7 +63,7 @@ module IndividualPhaseWork =
     /// |> Optic.set customCompH_ h
     /// |> Optic.set customCompW_ w
     /// ```
-    let customCompW_ = component_ >-> w_
+    let symCompW_ = component_ >-> w_
         // let optic = component_ >-> w_
         // Lens.create
         //     // (fun symbol -> symbol.Component.H)
@@ -70,7 +72,9 @@ module IndividualPhaseWork =
 
     // Use both based on need
 
-    /// Lens for the height (H) and width (W) dimensions of Symbol.Component
+    /// Lens for the height and width of a symbol component
+    ///
+    /// ```Symbol.Component.H * Symbol.Component.W```
     ///
     /// Get Example:
     /// ```
@@ -81,10 +85,10 @@ module IndividualPhaseWork =
     /// let _, w = Optic.get customCompHW_
     /// Optic.set customCompHW_ (newH, w) symbol
     /// ```
-    let customCompHW_ =
+    let symCompHW_ =
         Lens.create
-            (fun symbol -> Optic.get customCompH_ symbol, Optic.get customCompW_ symbol)
-            (fun (h, w) symbol -> symbol |> Optic.set customCompH_ h |> Optic.set customCompW_ w)
+            (fun symbol -> Optic.get symCompH_ symbol, Optic.get symCompW_ symbol)
+            (fun (h, w) symbol -> symbol |> Optic.set symCompH_ h |> Optic.set symCompW_ w)
 
     /// <description> Moves a symbol to a new position </description>
     /// <param name="symbol">The symbol to be moved.</param>
@@ -93,8 +97,10 @@ module IndividualPhaseWork =
     let moveSymbolPosition (symbol: Symbol) (newPos: XYPos) =
         BlockHelpers.moveSymbol (newPos - symbol.Pos) symbol
 
+    // portOrder_ used from SymbolInfo
     /// Lens for the port order of a symbol
-    let symbolPortOrder_ = portMaps_ >-> order_
+    /// ```(Symbol.PortMaps.Order)```
+    let symPortOrder_ = portMaps_ >-> order_
         // symbol.PortMaps.Order[side]
         // let optic = portMaps_ >-> order_
         // Lens.create
@@ -104,7 +110,7 @@ module IndividualPhaseWork =
     /// Returns the port order for the given side of a symbol
     let getSymbolSidePortOrder (symbol: Symbol) (side: Edge) =
         // symbol.PortMaps.Order[side]
-        Optic.get symbolPortOrder_ symbol
+        Optic.get symPortOrder_ symbol
         |> Map.tryFind side // Fairly sure tryFind is unnecessary but as explained below
         |> Option.defaultValue [] // Bad code in future/ other areas may require this
 
@@ -112,16 +118,50 @@ module IndividualPhaseWork =
     // i.e. expecting (Edge -> list<string>) but got Edge -> list<string> in Lens.set
     /// Overwrites the port order for the given side of a symbol
     let setSymbolSidePortOrder (symbol: Symbol) (side: Edge) (ports: string list) =
-        Optic.get symbolPortOrder_ symbol
+        Optic.get symPortOrder_ symbol
         |> Map.add side ports
-        |> Optic.set symbolPortOrder_ <| symbol
+        |> Optic.set symPortOrder_ <| symbol
 
-    // Lens for the reversed input ports of a symbol
-    let reversedInputPorts =
+    /// Lens for the reversed input ports of a symbol
+    /// ```(Symbol.ReversedInputPorts)```
+    let revInPorts_ =
         Lens.create
             (fun symbol -> symbol.ReversedInputPorts)
             (fun r symbol -> { symbol with ReversedInputPorts = r })
 
-    // Returns the position of a port on the sheet
+    /// Returns the position of a port on the sheet
     let getSheetPortPos (symbol: Symbol) (port: Port) =
         (Symbol.getPortPos symbol port) + symbol.Pos
+
+    /// Returns the bouding box of a symbol
+    let getSymbolBoundingBox (symbol: Symbol) =
+        Symbol.getSymbolBoundingBox symbol
+
+    /// Lens for the transform state of a symbol
+    /// ```(Symbol.STransform)```
+    let sTransform_ =
+        Lens.create
+            (fun symbol -> symbol.STransform)
+            (fun s symbol -> { symbol with STransform = s })
+
+    /// Lens for the rotation of a transform state
+    /// ```(STransform.Rotation)```
+    let rotation_ =
+        Lens.create
+            (fun transform -> transform.Rotation)
+            (fun r transform -> { transform with Rotation = r })
+
+    /// Lens for the flip of a transform state
+    /// ```(STransform.Flipped)```
+    let flipped_ =
+        Lens.create
+            (fun transform -> transform.Flipped)
+            (fun f transform -> { transform with Flipped = f })
+
+    /// Lens for the rotation of a symbol
+    /// ```(Symbol.STransform.Rotation)```
+    let symRotation_ = sTransform_ >-> rotation_
+
+    /// Lens for the flip of a symbol
+    /// ```(Symbol.STransform.Flipped)```
+    let symFlipped_ = sTransform_ >-> flipped_
