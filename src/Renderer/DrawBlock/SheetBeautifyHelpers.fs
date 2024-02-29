@@ -70,3 +70,11 @@ module IndividualPhaseWork =
         Lens.create
             (fun symbol -> symbol.Component.W)
             (fun w symbol -> symbol |> Optic.set (component_ >-> w_) w)
+
+
+    /// <description> Moves a symbol to a new position </description>
+    /// <param name="symbol">The symbol to be moved.</param>
+    /// <param name="newPos">The new position, represented by the top-left coordinate, to which the symbol will be moved.</param>
+    /// <returns>The symbol after it has been moved to the new position.</returns>
+    let moveSymbolPosition (symbol: Symbol) (newPos: XYPos) = 
+        BlockHelpers.moveSymbol  (newPos - symbol.Pos) symbol
