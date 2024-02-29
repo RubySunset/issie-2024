@@ -3,8 +3,6 @@
 open CommonTypes
 open DrawModelType
 
-open DrawModelType.BusWireT
-open Electron
 open Optics.Compose
 open Symbol
 open BlockHelpers
@@ -21,7 +19,7 @@ module Helpers =
         (strictOverlap1D (a1.X, a2.X) (b1.X, b2.X)) && (strictOverlap1D (a1.Y, a2.Y) (b1.Y, b2.Y))
 
 
-    let strictGetWiresInBox (model: SheetT.Model) (box: BoundingBox)  : (Wire * int) list =
+    let strictGetWiresInBox (model: SheetT.Model) (box: BoundingBox)  : (BusWireT.Wire * int) list =
         let wires = (List.ofSeq (Map.values model.Wire.Wires))
 
         let bottomRight =
@@ -30,7 +28,7 @@ module Helpers =
             }
 
         // State Tuple - (overlapping: bool, overlapping_wire_index: int)
-        let checkOverlapFolder (startPos: XYPos) (endPos: XYPos) (state: bool * int) (segment: Segment) : bool * int =
+        let checkOverlapFolder (startPos: XYPos) (endPos: XYPos) (state: bool * int) (segment: BusWireT.Segment) : bool * int =
             let strictOverlap = strictOverlap2D (startPos, endPos) (box.TopLeft, bottomRight)
             (fst state || strictOverlap), if strictOverlap then segment.Index else snd state
 
@@ -46,8 +44,8 @@ module Helpers =
                 | _ -> IsOdd
 
             match index, wire.InitialOrientation with
-            | IsEven, Vertical | IsOdd, Horizontal -> {X=0.; Y=wire.Segments[index].Length}
-            | IsEven, Horizontal | IsOdd, Vertical -> {X=wire.Segments[index].Length; Y=0.}
+            | IsEven, BusWireT.Vertical | IsOdd, BusWireT.Horizontal -> {X=0.; Y=wire.Segments[index].Length}
+            | IsEven, BusWireT.Horizontal | IsOdd, BusWireT.Vertical -> {X=wire.Segments[index].Length; Y=0.}
 
 
     ///index elements of a list
@@ -136,6 +134,89 @@ module T2 =
         |> List.distinct
         |>List.length
 
+
+
+
+module T3 =
+
+
+    open Helpers
+     let T3R (sheet :SheetT.Model)=
+
+
+        let mergeSegmentsOnXAxis (segments:  list<BusWireT.ASegment>) =
+            let rec mergeHelper acc current = function
+                | [] -> List.rev (current :: acc)
+                | next :: rest ->
+                    if current.End.X >= next.Start.X then
+                        let merged = {
+                            Start = { X = min current.Start.X next.Start.X; Y = current.Start.Y };
+                            End = { X = max current.End.X next.End.X; Y = current.End.Y }
+                        }
+                        mergeHelper acc merged rest
+                    else
+                        mergeHelper (current :: acc) next rest
+
+            match segments with
+            | [] -> []
+            | first :: rest -> mergeHelper [] first rest
+
+        let mergeSegmentsOnYAxis (segments:  list<BusWireT.ASegment>) =
+            let rec mergeHelper acc current = function
+                | [] -> List.rev (current :: acc)
+                | next :: rest ->
+                    if current.End.Y >= next.Start.Y then
+                        let merged = {
+                            Start = { Y = min current.Start.Y next.Start.Y; X = current.Start.X };
+                            End = { Y = max current.End.Y next.End.Y; X = current.End.X }
+                        }
+                        mergeHelper acc merged rest
+                    else
+                        mergeHelper (current :: acc) next rest
+
+            match segments with
+            | [] -> []
+            | first :: rest -> mergeHelper [] first rest
+        let sameNet (sheet :SheetT.Model) (segment1 :BusWireT.ASegment) (segment2:BusWireT.ASegment)  =
+            let wId1 = segment1.GetId |> snd
+            let wId2 = segment2.GetId |> snd
+            sheet.Wire.Wires[wId1].OutputPort = sheet.Wire.Wires[wId2].OutputPort
+
+        let allSegments =
+            sheet.Wire.Wires
+            |>Map.values
+            |>Seq.toList
+            |>List.collect getNonZeroAbsSegments
+
+        let horizontalSegments,verticalSegments = List.partition (fun segment -> (segment.Orientation = BusWireT.Horizontal)) allSegments
+        let visibleHorizontalSegments= List.groupBy (fun segment->segment.Start.Y) horizontalSegments
+                                        |>List.map snd
+                                        |>List.map (List.map (fun seg ->
+                                            if seg.Start.X > seg.End.X then
+                                              {seg with Start = {seg.Start with X = seg.End.X}; End = {seg.End with X = seg.Start.X}}
+                                            else
+                                              seg))
+                                        |>List.map (List.sortBy (fun seg->seg.Start.X))
+                                        |>List.collect (fun segList-> mergeSegmentsOnXAxis segList)
+
+        let visibleVerticalSegments = List.groupBy (fun segment->segment.Start.X) verticalSegments
+                                      |>List.map snd
+                                      |>List.map (List.map (fun seg ->
+                                            if seg.Start.Y > seg.End.Y then
+                                              {seg with Start = {seg.Start with Y = seg.End.Y}; End = {seg.End with Y = seg.Start.Y}}
+                                            else
+                                              seg))
+                                      |>List.map (List.sortBy (fun seg->seg.Start.X))
+                                      |>List.collect (fun segList-> mergeSegmentsOnYAxis segList)
+        let sameNet,diffNet = List.allPairs visibleHorizontalSegments  visibleVerticalSegments
+                              |> List.partition (fun (s1,s2) -> sameNet sheet s1 s2)
+
+        let sameNetCount = List.filter (fun (s1,s2) ->strictOverlap1D (s1.Start.X ,s2.Start.X) (s1.End.Y ,s2.End.Y)) sameNet
+                           |>List.length
+        let diffNetCount = List.filter (fun (s1,s2) ->overlap1D (s1.Start.X ,s2.Start.X) (s1.End.Y ,s2.End.Y)) diffNet
+                           |>List.length
+
+        sameNetCount+diffNetCount
 
 
 
