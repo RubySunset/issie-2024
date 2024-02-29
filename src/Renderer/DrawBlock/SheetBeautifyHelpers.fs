@@ -248,5 +248,22 @@ module T4 =
         |>List.map (fun seg ->(abs seg.Length))
         |>List.sum
 
+module T5 =
+
+
+    open Helpers
+    let T5R (sheet :SheetT.Model)=
+        let allASegments =
+            sheet.Wire.Wires
+            |>Map.values
+            |>Seq.toList
+            |>List.collect getNonZeroAbsSegments
+
+
+        let visibleHorizontalSegments,visibleVerticalSegments =getVisibleASegments allASegments
+        List.allPairs visibleHorizontalSegments visibleVerticalSegments
+        |>List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y))
+        |>List.length
+
 
 
