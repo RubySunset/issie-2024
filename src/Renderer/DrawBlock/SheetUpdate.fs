@@ -188,7 +188,7 @@ let update (msg : Msg) (issieModel : ModelType.Model): ModelType.Model*Cmd<Model
         | Down when mouseAlreadyDown = true -> model, Cmd.none
         | Down -> mDownUpdate model mMsg
         | Drag ->
-            printfn "Res = %A" <| SheetBeautifyHelpers.T3.T3R model
+            printfn "Res = %A" <| SheetBeautifyHelpers.T4.T4R model
             mDragUpdate model mMsg
         | Up -> mUpUpdate model mMsg
         | Move -> mMoveUpdate model mMsg

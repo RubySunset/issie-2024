@@ -37,7 +37,7 @@ module Helpers =
         |> List.filter (fun l -> fst (fst l))
         |> List.map (fun ((_, index), w) -> w, index)
 
-    let getSegmentVector  (wire:BusWireT.Wire) (index:int)  :XYPos =
+    let getSegmentVector  (wire:Wire) (index:int)  :XYPos =
             //Takes Segment index and wire and returns XY representation
             let (|IsEven|IsOdd|) (n: int) =
                 match n % 2 with
@@ -60,6 +60,70 @@ module Helpers =
         |>List.map ( fun ((i1,l1e),(i2,l2e))->  if i1<i2 then (i1,l1e),(i2,l2e) else (i2,l2e),(i1,l1e))
         |>List.distinct
         |>List.map (fun ((i1,l1e),(i2,l2e))-> (l1e,l2e) )
+    let mergeASegmentsOnXAxis (segments:  list<ASegment>) =
+            let rec mergeHelper acc current = function
+                | [] -> List.rev (current :: acc)
+                | next :: rest ->
+                    if current.End.X >= next.Start.X then
+                        let merged = {
+                            current with Start = { X = min current.Start.X next.Start.X; Y = current.Start.Y };
+                                         End = { X = max current.End.X next.End.X; Y = current.End.Y }
+                        }
+                        mergeHelper acc merged rest
+                    else
+                        mergeHelper (current :: acc) next rest
+
+            match segments with
+            | [] -> []
+            | first :: rest -> mergeHelper [] first rest
+
+    let mergeASegmentsOnYAxis (segments:  list<ASegment>) =
+        let rec mergeHelper acc current = function
+            | [] -> List.rev (current :: acc)
+            | next :: rest ->
+                if current.End.Y >= next.Start.Y then
+                    let merged = {
+                        current with Start = { Y = min current.Start.Y next.Start.Y; X = current.Start.X };
+                                    End = { Y = max current.End.Y next.End.Y; X = current.End.X }
+                    }
+                    mergeHelper acc merged rest
+                else
+                    mergeHelper (current :: acc) next rest
+
+        match segments with
+        | [] -> []
+        | first :: rest -> mergeHelper [] first rest
+
+    let sameNet (sheet :SheetT.Model) (segment1 :ASegment) (segment2:ASegment)  =
+        let wId1 = segment1.GetId |> snd
+        let wId2 = segment2.GetId |> snd
+        sheet.Wire.Wires[wId1].OutputPort = sheet.Wire.Wires[wId2].OutputPort
+
+    let groupASegmentsByNet (sheet :SheetT.Model) (aSegments :List<ASegment>)=
+        List.groupBy (fun (aSeg:ASegment) -> sheet.Wire.Wires[aSeg.GetId|>snd].OutputPort) aSegments
+        |>List.map snd
+    let getVisibleASegments (segments:List<ASegment>) :(ASegment list * ASegment list)=
+        let horizontalSegments,verticalSegments = List.partition (fun (segment:ASegment) -> (segment.Orientation = Horizontal)) segments
+        let visibleHorizontalSegments= List.groupBy (fun segment->segment.Start.Y) horizontalSegments
+                                        |>List.map snd
+                                        |>List.map (List.map (fun seg ->
+                                            if seg.Start.X > seg.End.X then
+                                              {seg with Start = {seg.Start with X = seg.End.X}; End = {seg.End with X = seg.Start.X}}
+                                            else
+                                              seg))
+                                        |>List.map (List.sortBy (fun seg->seg.Start.X))
+                                        |>List.collect mergeASegmentsOnXAxis
+
+        let visibleVerticalSegments = List.groupBy (fun segment->segment.Start.X) verticalSegments
+                                      |>List.map snd
+                                      |>List.map (List.map (fun seg ->
+                                            if seg.Start.Y > seg.End.Y then
+                                              {seg with Start = {seg.Start with Y = seg.End.Y}; End = {seg.End with Y = seg.Start.Y}}
+                                            else
+                                              seg))
+                                      |>List.map (List.sortBy (fun seg->seg.Start.X))
+                                      |>List.collect mergeASegmentsOnYAxis
+        visibleHorizontalSegments,visibleVerticalSegments
 
 
 module B1 =
@@ -142,80 +206,47 @@ module T3 =
 
 
     open Helpers
-     let T3R (sheet :SheetT.Model)=
+    let T3R (sheet :SheetT.Model)=
 
-
-        let mergeSegmentsOnXAxis (segments:  list<ASegment>) =
-            let rec mergeHelper acc current = function
-                | [] -> List.rev (current :: acc)
-                | next :: rest ->
-                    if current.End.X >= next.Start.X then
-                        let merged = {
-                            current with Start = { X = min current.Start.X next.Start.X; Y = current.Start.Y };
-                                         End = { X = max current.End.X next.End.X; Y = current.End.Y }
-                        }
-                        mergeHelper acc merged rest
-                    else
-                        mergeHelper (current :: acc) next rest
-
-            match segments with
-            | [] -> []
-            | first :: rest -> mergeHelper [] first rest
-
-        let mergeSegmentsOnYAxis (segments:  list<ASegment>) =
-            let rec mergeHelper acc current = function
-                | [] -> List.rev (current :: acc)
-                | next :: rest ->
-                    if current.End.Y >= next.Start.Y then
-                        let merged = {
-                            current with Start = { Y = min current.Start.Y next.Start.Y; X = current.Start.X };
-                                        End = { Y = max current.End.Y next.End.Y; X = current.End.X }
-                        }
-                        mergeHelper acc merged rest
-                    else
-                        mergeHelper (current :: acc) next rest
-
-            match segments with
-            | [] -> []
-            | first :: rest -> mergeHelper [] first rest
-        let sameNet (sheet :SheetT.Model) (segment1 :ASegment) (segment2:ASegment)  =
-            let wId1 = segment1.GetId |> snd
-            let wId2 = segment2.GetId |> snd
-            sheet.Wire.Wires[wId1].OutputPort = sheet.Wire.Wires[wId2].OutputPort
-
-        let allSegments =
+        let allASegments =
             sheet.Wire.Wires
             |>Map.values
             |>Seq.toList
             |>List.collect getNonZeroAbsSegments
 
-        let horizontalSegments,verticalSegments = List.partition (fun (segment:ASegment) -> (segment.Orientation = BusWireT.Horizontal)) allSegments
-        let visibleHorizontalSegments= List.groupBy (fun segment->segment.Start.Y) horizontalSegments
-                                        |>List.map snd
-                                        |>List.map (List.map (fun seg ->
-                                            if seg.Start.X > seg.End.X then
-                                              {seg with Start = {seg.Start with X = seg.End.X}; End = {seg.End with X = seg.Start.X}}
-                                            else
-                                              seg))
-                                        |>List.map (List.sortBy (fun seg->seg.Start.X))
-                                        |>List.collect (fun segList-> mergeSegmentsOnXAxis segList)
-
-        let visibleVerticalSegments = List.groupBy (fun segment->segment.Start.X) verticalSegments
-                                      |>List.map snd
-                                      |>List.map (List.map (fun seg ->
-                                            if seg.Start.Y > seg.End.Y then
-                                              {seg with Start = {seg.Start with Y = seg.End.Y}; End = {seg.End with Y = seg.Start.Y}}
-                                            else
-                                              seg))
-                                      |>List.map (List.sortBy (fun seg->seg.Start.X))
-                                      |>List.collect (fun segList-> mergeSegmentsOnYAxis segList)
+        let visibleHorizontalSegments,visibleVerticalSegments =getVisibleASegments allASegments
 
         let sameNet,diffNet = List.allPairs visibleHorizontalSegments  visibleVerticalSegments
-                              |> List.partition (fun (s1,s2) -> sameNet sheet s1 s2)
+                                |> List.partition (fun (s1,s2) -> sameNet sheet s1 s2)
 
         let sameNetCount = List.filter (fun (horizontalSegment,verticalSegment) ->strictOverlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && strictOverlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y)) sameNet
-                           |>List.length
+                            |>List.length
         let diffNetCount = List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y)) diffNet
-                           |>List.length
+                            |>List.length
 
         sameNetCount+diffNetCount
+
+
+
+module T4 =
+
+
+    open Helpers
+    let T4R (sheet :SheetT.Model)=
+        let allASegments =
+            sheet.Wire.Wires
+            |>Map.values
+            |>Seq.toList
+            |>List.collect getNonZeroAbsSegments
+
+
+        allASegments
+        |>groupASegmentsByNet sheet
+        |>List.map getVisibleASegments
+        |>List.collect (fun (hList,vList) -> hList@vList)
+        |>List.map (fun aSeg -> aSeg.Segment)
+        |>List.map (fun seg ->(abs seg.Length))
+        |>List.sum
+
+
+
