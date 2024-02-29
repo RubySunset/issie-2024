@@ -71,7 +71,7 @@ module IndividualPhaseWork =
     // Use both based on need
 
     /// Lens for the height (H) and width (W) dimensions of Symbol.Component
-    /// 
+    ///
     /// Get Example:
     /// ```
     /// let h, w = Optic.get customCompHW_
@@ -101,17 +101,27 @@ module IndividualPhaseWork =
         //     (fun symbol -> Optic.get optic symbol)
         //     (fun order symbol -> Optic.set optic order symbol)
 
-    /// Returns the port order for the given side of a symbol 
-    let getSymbolSidePortOrder symbol side =
+    /// Returns the port order for the given side of a symbol
+    let getSymbolSidePortOrder (symbol: Symbol) (side: Edge) =
         // symbol.PortMaps.Order[side]
         Optic.get symbolPortOrder_ symbol
         |> Map.tryFind side // Fairly sure tryFind is unnecessary but as explained below
         |> Option.defaultValue [] // Bad code in future/ other areas may require this
 
-    // Can't use Lens even if symbol is last output as Lens.get only takes one input
+    // Can't use Lens even if symbol is last parameter as Lens.get only takes one input
     // i.e. expecting (Edge -> list<string>) but got Edge -> list<string> in Lens.set
     /// Overwrites the port order for the given side of a symbol
-    let setSymbolSidePortOrder symbol side ports =
+    let setSymbolSidePortOrder (symbol: Symbol) (side: Edge) (ports: string list) =
         Optic.get symbolPortOrder_ symbol
         |> Map.add side ports
         |> Optic.set symbolPortOrder_ <| symbol
+
+    // Lens for the reversed input ports of a symbol
+    let reversedInputPorts =
+        Lens.create
+            (fun symbol -> symbol.ReversedInputPorts)
+            (fun r symbol -> { symbol with ReversedInputPorts = r })
+
+    // Returns the position of a port on the sheet
+    let getSheetPortPos (symbol: Symbol) (port: Port) =
+        (Symbol.getPortPos symbol port) + symbol.Pos
