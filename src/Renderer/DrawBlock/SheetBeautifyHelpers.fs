@@ -292,6 +292,77 @@ let PairsOfIntersectingBoxes (model : SheetT.Model) : int =
 // can get the segment list of a wire using the function in BlockHelpers.fs line 160
 // 
 
+let visibleSegments (wId: ConnectionId) (model: SheetT.Model): XYPos list =
+
+    let wire = model.Wire.Wires[wId] // get wire from model
+
+    let (|IsEven|IsOdd|) (n: int) = match n % 2 with | 0 -> IsEven | _ -> IsOdd
+
+        /// Convert seg into its XY Vector (from start to end of segment).
+        /// index must be the index of seg in its containing wire.
+    let getSegmentVector (index:int) (seg: BusWireT.Segment) =
+            // The implicit horizontal or vertical direction  of a segment is determined by 
+            // its index in the list of wire segments and the wire initial direction
+        match index, wire.InitialOrientation with
+        | IsEven, BusWireT.Vertical | IsOdd, BusWireT.Horizontal -> {X=0.; Y=seg.Length}
+        | IsEven, BusWireT.Horizontal | IsOdd, BusWireT.Vertical -> {X=seg.Length; Y=0.}
+
+        /// Return a list of segment vectors with 3 vectors coalesced into one visible equivalent
+        /// if this is possible, otherwise return segVecs unchanged.
+        /// Index must be in range 1..segVecs
+    let tryCoalesceAboutIndex (segVecs: XYPos list) (index: int)  =
+        if segVecs[index] =~ XYPos.zero
+        then
+            segVecs[0..index-2] @
+            [segVecs[index-1] + segVecs[index+1]] @
+            segVecs[index+2..segVecs.Length - 1]
+        else
+            segVecs
+
+    wire.Segments
+    |> List.mapi getSegmentVector
+    |> (fun segVecs ->
+            (segVecs,[1..segVecs.Length-2])
+            ||> List.fold tryCoalesceAboutIndex)
+
+
+let getVisSegLst (model : SheetT.Model) = 
+    // map of connId and wires
+    let mapOfWiresConnId = model.Wire.Wires |> Map.toList
+    // list of wires
+    let lstOfWires = mapOfWiresConnId |> List.map snd
+    // get the list of starting position in order 
+    let lstWireStartPos = lstOfWires |> List.map (fun wire -> wire.StartPos)
+    // get the list of connection IDs
+    let lstOfConId = mapOfWiresConnId |> List.map fst
+    // using visibleSegments get the vectors lists corresponding to the connection IDs and their wires
+    let lstOfVectors = lstOfConId |> List.map (fun conId -> visibleSegments conId model)\
+
+    // get a list of vertices
+    let vectorsToPositions vectors startPos =
+        let rec accumulatePositions acc = function
+            | [] -> acc
+            | v :: vs ->
+                let newPos = match acc with
+                              | [] -> startPos + v
+                              | p :: _ -> p + v
+                accumulatePositions (newPos :: acc) vs
+        accumulatePositions [] vectors |> List.rev
+    
+    // lst of vectors into positions 
+    let positions = List.map2 vectorsToPositions lstOfVectors lstWireStartPos
+    // position to segments
+    let segments = positions |> List.map List.pairwise |> List.collect id
+    // remove zero length segments
+    segments |> List.filter (fun segs -> segs <> [])
+
+
+
+
+    
+
+
+
 let segIntersectingBB (box : BoundingBox) (segment : BusWireT.ASegment) = 
     let intersectOption = segmentIntersectsBoundingBox box segment.Start segment.End
     match intersectOption with
@@ -303,9 +374,10 @@ let numVisSegsIntersectingSymbols (model : SheetT.Model) : int =
     let BBMap = model.BoundingBoxes
     // List of bounding boxes
     let lstOfBB = BBMap |> Map.toSeq |> Seq.map snd |> Seq.toList
-    let lstOfWires = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList
+    // let lstOfWires = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList
     // list of visible segments
-    let lstOfVisibleSegments = lstOfWires |> List.collect (fun wire -> getAbsSegments wire)
+    // let lstOfVisibleSegments = lstOfWires |> List.collect (fun wire -> getNonZeroAbsSegments wire)
+    let lstOfVisibleSegments = getVisSegLst model
 
     lstOfVisibleSegments
     |> List.map (fun seg -> lstOfBB |> List.map (fun bb -> (seg, bb)))
