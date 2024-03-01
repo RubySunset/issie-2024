@@ -325,43 +325,48 @@ let visibleSegments (wId: ConnectionId) (model: SheetT.Model): XYPos list =
             (segVecs,[1..segVecs.Length-2])
             ||> List.fold tryCoalesceAboutIndex)
 
+// let getVisSegLst (model : SheetT.Model) = 
+//     // map of connId and wires
+//     let mapOfWiresConnId = model.Wire.Wires |> Map.toList
+//     // list of wires
+//     let lstOfWires = mapOfWiresConnId |> List.map snd
+//     // get the list of starting position in order 
+//     let lstWireStartPos = lstOfWires |> List.map (fun wire -> wire.StartPos)
+//     // get the list of connection IDs
+//     let lstOfConId = mapOfWiresConnId |> List.map fst
+//     // using visibleSegments get the vectors lists corresponding to the connection IDs and their wires
+//     let lstOfVectors = lstOfConId |> List.map (fun conId -> visibleSegments conId model)
 
-let getVisSegLst (model : SheetT.Model) = 
-    // map of connId and wires
-    let mapOfWiresConnId = model.Wire.Wires |> Map.toList
-    // list of wires
-    let lstOfWires = mapOfWiresConnId |> List.map snd
-    // get the list of starting position in order 
-    let lstWireStartPos = lstOfWires |> List.map (fun wire -> wire.StartPos)
-    // get the list of connection IDs
-    let lstOfConId = mapOfWiresConnId |> List.map fst
-    // using visibleSegments get the vectors lists corresponding to the connection IDs and their wires
-    let lstOfVectors = lstOfConId |> List.map (fun conId -> visibleSegments conId model)\
-
-    // get a list of vertices
-    let vectorsToPositions vectors startPos =
-        let rec accumulatePositions acc = function
-            | [] -> acc
-            | v :: vs ->
-                let newPos = match acc with
-                              | [] -> startPos + v
-                              | p :: _ -> p + v
-                accumulatePositions (newPos :: acc) vs
-        accumulatePositions [] vectors |> List.rev
+//     // get a list of vertices
+//     let vectorsToPositions vectors startPos =
+//         let rec accumulatePositions acc = function
+//             | [] -> acc
+//             | v :: vs ->
+//                 let newPos = match acc with
+//                               | [] -> startPos + v  // Assuming this '+' is an abstract representation of vector addition
+//                               | p :: _ -> p + v
+//                 accumulatePositions (newPos :: acc) vs
+//         accumulatePositions [] vectors |> List.rev
     
-    // lst of vectors into positions 
-    let positions = List.map2 vectorsToPositions lstOfVectors lstWireStartPos
-    // position to segments
-    let segments = positions |> List.map List.pairwise |> List.collect id
+//     // lst of vectors into positions 
+//     let positions = List.map2 vectorsToPositions lstOfVectors lstWireStartPos
+//     // position to segments
+//     let segments = positions |> List.map List.pairwise |> List.collect id
+//     segments
     // remove zero length segments
-    segments |> List.filter (fun segs -> segs <> [])
+    // segments |> List.filter (fun segs -> segs <> [])
 
+// let segIntersectingBB (box : BoundingBox) (segment : BusWireT.ASegment) = 
+//     let intersectOption = segmentIntersectsBoundingBox box segment.Start segment.End
+//     match intersectOption with
+//     | Some _ -> true
+//     | None -> false
 
-
-
-    
-
-
+// let segIntersectingBB2 (box : BoundingBox) (segment : XYPos*XYPos) = 
+//     let intersectOption = segmentIntersectsBoundingBox box (fst segment) (snd segment)
+//     match intersectOption with
+//     | Some _ -> true
+//     | None -> false
 
 let segIntersectingBB (box : BoundingBox) (segment : BusWireT.ASegment) = 
     let intersectOption = segmentIntersectsBoundingBox box segment.Start segment.End
@@ -374,10 +379,9 @@ let numVisSegsIntersectingSymbols (model : SheetT.Model) : int =
     let BBMap = model.BoundingBoxes
     // List of bounding boxes
     let lstOfBB = BBMap |> Map.toSeq |> Seq.map snd |> Seq.toList
-    // let lstOfWires = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList
+    let lstOfWires = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList
     // list of visible segments
-    // let lstOfVisibleSegments = lstOfWires |> List.collect (fun wire -> getNonZeroAbsSegments wire)
-    let lstOfVisibleSegments = getVisSegLst model
+    let lstOfVisibleSegments = lstOfWires |> List.collect (fun wire -> getNonZeroAbsSegments wire)
 
     lstOfVisibleSegments
     |> List.map (fun seg -> lstOfBB |> List.map (fun bb -> (seg, bb)))
@@ -388,9 +392,15 @@ let numVisSegsIntersectingSymbols (model : SheetT.Model) : int =
 
 
 
+(*T3*)
 
 
-    
 
 
-    
+
+
+
+
+
+
+
