@@ -48,6 +48,26 @@ module Helpers =
             | IsEven, Vertical | IsOdd, Horizontal -> {X=0.; Y=wire.Segments[index].Length}
             | IsEven, Horizontal | IsOdd, Vertical -> {X=wire.Segments[index].Length; Y=0.}
 
+    let doesSegmentIntersectsBoundingBox (box: BoundingBox) (aSegment:ASegment) =
+        let toRect p1 p2 =
+            let topLeft, bottomRight =
+                if lThanEqualPos p1 p2 then
+                    p1, p2
+                else
+                    p2, p1
+
+            { TopLeft = topLeft
+              BottomRight = bottomRight }
+
+        let bbBottomRight =
+            { X = box.TopLeft.X + box.W
+              Y = box.TopLeft.Y + box.H }
+
+        let bbRect = toRect box.TopLeft bbBottomRight
+        let segRect = toRect aSegment.Start aSegment.End
+
+        rectanglesIntersect bbRect segRect
+
 
     ///index elements of a list
     let indexList (list :List<'T>) =  List.mapi (fun i list_element ->(i,list_element)) list
@@ -55,6 +75,15 @@ module Helpers =
     let distinctPairs (l1:List<'T>)=
         let l1Indexed = indexList l1
         let l2Indexed = indexList l1
+        List.allPairs l1Indexed l2Indexed
+        |>List.filter( fun ((i1,l1e),(i2,l2e))->  i1<>i2 )
+        |>List.map ( fun ((i1,l1e),(i2,l2e))->  if i1<i2 then (i1,l1e),(i2,l2e) else (i2,l2e),(i1,l1e))
+        |>List.distinct
+        |>List.map (fun ((i1,l1e),(i2,l2e))-> (l1e,l2e) )
+
+    let distinctPairs2 (l1:List<'T>) (l2:List<'T>)=
+        let l1Indexed = indexList l1
+        let l2Indexed = indexList l2
         List.allPairs l1Indexed l2Indexed
         |>List.filter( fun ((i1,l1e),(i2,l2e))->  i1<>i2 )
         |>List.map ( fun ((i1,l1e),(i2,l2e))->  if i1<i2 then (i1,l1e),(i2,l2e) else (i2,l2e),(i1,l1e))
@@ -124,6 +153,15 @@ module Helpers =
                                       |>List.map (List.sortBy (fun seg->seg.Start.X))
                                       |>List.collect mergeASegmentsOnYAxis
         visibleHorizontalSegments,visibleVerticalSegments
+
+    let doesRetrace (aSegments :List<ASegment>)=
+            let segmentsArray = aSegments|>List.toArray
+
+            segmentsArray.Length = 3 && segmentsArray[1].Segment.IsZero && (segmentsArray[0].Segment.Length *segmentsArray[2].Segment.Length )<0
+
+    let aSegmentIntersectsAnyBoundingBoxed (aSegment :ASegment) ( boundingBoxes :List<BoundingBox>) =
+           List.filter (fun (bb) -> doesSegmentIntersectsBoundingBox bb aSegment) boundingBoxes
+           |>List.isEmpty
 
 
 module B1 =
@@ -257,13 +295,61 @@ module T5 =
             sheet.Wire.Wires
             |>Map.values
             |>Seq.toList
-            |>List.collect getNonZeroAbsSegments
+            |>List.map getNonZeroAbsSegments
 
 
-        let visibleHorizontalSegments,visibleVerticalSegments =getVisibleASegments allASegments
-        List.allPairs visibleHorizontalSegments visibleVerticalSegments
-        |>List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y) && (sameNet sheet verticalSegment horizontalSegment))
+        let allASegmentsPartitioned = List.map (List.partition (fun (segment:ASegment) -> (segment.Orientation = Horizontal))) allASegments
+        List.map (fun (l1,l2)->List.allPairs l1 l2) allASegmentsPartitioned
+        |>List.map (List.filter (fun (horizontalSegment,verticalSegment) ->overlap1D (horizontalSegment.Start.X ,horizontalSegment.End.X) (verticalSegment.Start.X ,verticalSegment.End.X) && overlap1D (horizontalSegment.Start.Y ,horizontalSegment.End.Y) (verticalSegment.Start.Y ,verticalSegment.End.Y) && (sameNet sheet verticalSegment horizontalSegment)))
+        |>(List.collect id)
         |>List.length
+
+
+module T6 =
+
+
+    open Helpers
+    let T6R (sheet :SheetT.Model) =
+
+
+        let symbolsBoundingBoxes = sheet.Wire.Symbol.Symbols
+                                    |>Map.values
+                                    |>Seq.toList
+                                    |>List.map (fun symbol -> symbol.SymbolBoundingBox)
+
+
+        let allASegments =
+            sheet.Wire.Wires
+            |>Map.values
+            |>Seq.toList
+            |>List.map getAbsSegments
+
+        let allASegmentsPartitioned = allASegments
+                                    |>List.map (List.windowed 3)
+
+        let allRetracingSegments =
+                                    allASegmentsPartitioned
+                                    |> List.map (fun outerList ->
+                                        outerList
+                                        |> List.filter doesRetrace)
+                                    |> List.collect (List.collect id)
+
+
+
+
+        let allStartingSegments= List.map (List.map List.head ) allASegmentsPartitioned
+        let allEndingSegments= List.map (List.map List.last ) allASegmentsPartitioned
+        let intersectingStartSegmentsWithSymbols = allStartingSegments
+                                                   |> List.filter doesRetrace
+                                                   |>List.map List.last
+                                                   |>List.filter ( fun aSegment -> aSegmentIntersectsAnyBoundingBoxed aSegment symbolsBoundingBoxes)
+        let intersectingEndSegmentsWithSymbols = allStartingSegments
+                                                   |> List.filter doesRetrace
+                                                   |>List.map List.head
+                                                   |>List.filter ( fun aSegment -> aSegmentIntersectsAnyBoundingBoxed aSegment symbolsBoundingBoxes)
+
+        (allRetracingSegments , intersectingStartSegmentsWithSymbols@intersectingEndSegmentsWithSymbols)
+
 
 
 
