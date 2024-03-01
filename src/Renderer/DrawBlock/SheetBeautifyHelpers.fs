@@ -5,31 +5,27 @@
 
 open CommonTypes
 open DrawModelType.SymbolT
+open DrawModelType.SheetT
+open DrawModelType.BusWireT
+open DrawModelType
 open Optics
 open Operators
+open Helpers
+open BlockHelpers
+open BusWireUpdateHelpers
 
 module IndividualPhaseWork =
-    // B1RW Reads or Writes the dimensions (H and W) of a custom component symbol
+    // I interpreted lenses to only affect the variable it is assigned as functions already exist
+    // If 
 
-    // Bad as would need to use both get and set for both vars if only needed to set one of either W or H
-    // Also the getter will always return both H and W sometimes unnecessarily
-
-    let private initial_CustomCompHW_' =
-        // can take these out at just use customCompH_ and customCompW_
-        let opticH = (component_ >-> h_)
-        let opticW = (component_ >-> w_)
+    // Original Code NOT needed as functions already exist, it would be making a meaningless lens
+    // I am also not going to rewrite a function that already exists
+    // to adjust the corresponding/ related variables
+    let initialCustomCompHW_' =
         Lens.create
-            // Original Code
-            // (fun sym -> match sym.Component.Type with | Custom _ -> getRotatedHAndW sym | _ -> 0, 0)
-            // (fun (h, w) sym -> setCustomCompHW h w sym)
-            // (fun symbol -> symbol.Component.H, symbol.Component.W)
-            (fun symbol -> Optic.get opticH symbol, Optic.get opticW symbol)
-            (fun (h, w) symbol -> symbol |> Optic.set opticH h |> Optic.set opticW w)
-
-    // Better as can be nicely pipelined if both need to be set and code is easier to read
-    // Although a little more verbose if wanting to get both
-    // e.g. let h, w = Optic.get customCompH_ symbol, Optic.get customCompW_ symbol
-
+            (fun sym -> match sym.Component.Type with | Custom _ -> Symbol.getRotatedHAndW sym | _ -> 0, 0)
+            (fun (h, w) sym -> BlockHelpers.setCustomCompHW h w sym)
+    
     /// Lens for the height of a symbol component
     /// ```(Symbol.Component.H)```
     ///
@@ -41,14 +37,8 @@ module IndividualPhaseWork =
     /// ```
     /// symbol
     /// |> Optic.set customCompH_ h
-    /// |> Optic.set customCompW_ w
     /// ```
     let symCompH_ = component_ >-> h_
-        // let optic = component_ >-> h_
-        // Lens.create
-        //     // (fun symbol -> symbol.Component.H)
-        //     (fun symbol -> Optic.get optic symbol)
-        //     (fun h symbol -> Optic.set optic h symbol)
 
     /// Lens for the width of a symbol component
     /// ```(Symbol.Component.W)```
@@ -60,17 +50,11 @@ module IndividualPhaseWork =
     ///Set Example:
     /// ```
     /// symbol
-    /// |> Optic.set customCompH_ h
     /// |> Optic.set customCompW_ w
     /// ```
     let symCompW_ = component_ >-> w_
-        // let optic = component_ >-> w_
-        // Lens.create
-        //     // (fun symbol -> symbol.Component.H)
-        //     (fun symbol -> Optic.get optic symbol)
-        //     (fun w symbol -> Optic.set optic w symbol)
 
-    // Use both based on need
+    // Option to use both based on need
 
     /// Lens for the height and width of a symbol component
     ///
@@ -83,7 +67,8 @@ module IndividualPhaseWork =
     ///Set Example:
     /// ```
     /// let _, w = Optic.get customCompHW_
-    /// Optic.set customCompHW_ (newH, w) symbol
+    /// Optic.set customCompHW_ (newH, w) symbol1
+    /// Optic.set customCompHW_ (newH, newW) symbol2
     /// ```
     let symCompHW_ =
         Lens.create
@@ -97,15 +82,10 @@ module IndividualPhaseWork =
     let moveSymbolPosition (symbol: Symbol) (newPos: XYPos) =
         BlockHelpers.moveSymbol (newPos - symbol.Pos) symbol
 
-    // portOrder_ used from SymbolInfo
+    // Names such as portOrder_ used from SymbolInfo
     /// Lens for the port order of a symbol
     /// ```(Symbol.PortMaps.Order)```
     let symPortOrder_ = portMaps_ >-> order_
-        // symbol.PortMaps.Order[side]
-        // let optic = portMaps_ >-> order_
-        // Lens.create
-        //     (fun symbol -> Optic.get optic symbol)
-        //     (fun order symbol -> Optic.set optic order symbol)
 
     /// Returns the port order for the given side of a symbol
     let getSymbolSidePortOrder (symbol: Symbol) (side: Edge) =
@@ -114,28 +94,34 @@ module IndividualPhaseWork =
         |> Map.tryFind side // Fairly sure tryFind is unnecessary but as explained below
         |> Option.defaultValue [] // Bad code in future/ other areas may require this
 
-    // Can't use Lens even if symbol is last parameter as Lens.get only takes one input
+    // Can't use Lens even if symbol is last parameter as corresponding Lens.get only takes one input
     // i.e. expecting (Edge -> list<string>) but got Edge -> list<string> in Lens.set
     /// Overwrites the port order for the given side of a symbol
-    let setSymbolSidePortOrder (symbol: Symbol) (side: Edge) (ports: string list) =
+    let setSymbolSidePortOrder (symbol: SymbolT.Symbol) (side: Edge) (ports: string list) =
         Optic.get symPortOrder_ symbol
         |> Map.add side ports
         |> Optic.set symPortOrder_ <| symbol
 
-    /// Lens for the reversed input ports of a symbol
+    // This lens should not be used if the component is not a MUX 
+    // so I have decided to not check for it to maintain simplicity.
+    // If it is used for a not MUX component it should only affect the symbol variable
+    // and not the actual component in ISSIE as it would not be accounted for in such a case
+    // This also enables ReversedInputPorts to be used in future 
+    // components without need to change the lens code
+    /// Lens for the reversed input ports of a (MUX) symbol
     /// ```(Symbol.ReversedInputPorts)```
-    let revInPorts_ =
+    let revInputPorts_ =
         Lens.create
-            (fun symbol -> symbol.ReversedInputPorts)
-            (fun r symbol -> { symbol with ReversedInputPorts = r })
+            (fun symbol -> Option.defaultValue false symbol.ReversedInputPorts)
+            (fun r symbol -> { symbol with ReversedInputPorts = Some r })
 
     /// Returns the position of a port on the sheet
-    let getSheetPortPos (symbol: Symbol) (port: Port) =
+    let getSheetPortPos (symbol: SymbolT.Symbol) (port: Port) =
         (Symbol.getPortPos symbol port) + symbol.Pos
 
+    // Function already exists...
     /// Returns the bouding box of a symbol
-    let getSymbolBoundingBox (symbol: Symbol) =
-        Symbol.getSymbolBoundingBox symbol
+    let getSymbolBoundingBox = Symbol.getSymbolBoundingBox
 
     /// Lens for the transform state of a symbol
     /// ```(Symbol.STransform)```
@@ -158,10 +144,118 @@ module IndividualPhaseWork =
             (fun transform -> transform.Flipped)
             (fun f transform -> { transform with Flipped = f })
 
+    // Simple lens made as RotateScale.rotateSymbolByDegree and SymbolT.rotateAntiClockByAng exist
     /// Lens for the rotation of a symbol
     /// ```(Symbol.STransform.Rotation)```
     let symRotation_ = sTransform_ >-> rotation_
 
+    // Simple lens made as SymbolT.Flip exists
     /// Lens for the flip of a symbol
     /// ```(Symbol.STransform.Flipped)```
     let symFlipped_ = sTransform_ >-> flipped_
+
+
+    /// Returns the number of intersecting symbol pairs in a sheet
+    let intersectingSymbolPairsCount (model: SheetT.Model) = 
+        // Folds over list[i] and pairs it with each value in list[i+1:]
+        // Sums the number of intersecting bound pairs found on each fold
+        /// Folder function fo unique intersecting bounding box pairs
+        let intersectingPairCount (tail, count) curVal = 
+            let newResult =
+                tail
+                |> List.map (fun nextVal -> (curVal, nextVal))
+                |> List.filter (fun (box1, box2) -> BlockHelpers.overlap2DBox box1 box2)
+                |> List.length
+                |> (+) count
+            match tail with 
+            | _hd::tl -> (tl, newResult)
+            | _ -> ([], newResult)
+
+        // Not using snd for clarity
+        /// Returns number of intersecting box pairs in a BoundingBox list
+        let pairsCount lst = 
+            List.fold intersectingPairCount (List.tail lst, 0) lst
+            |> function | _state, count -> count
+
+        model.BoundingBoxes
+        |> mapValues
+        |> Array.toList
+        |> pairsCount
+    
+    /// Returns number of distinct segments that intersect a symbol
+    let visibleSegmentIntersectCount (model: SheetT.Model) =
+        /// Checks if Segment 2 is contained within Segment 1
+        let isContained (seg1: ASegment) (seg2: ASegment) = 
+            match seg1.Orientation, seg2.Orientation with
+            | Horizontal, Horizontal -> 
+                   seg1.Start.Y  = seg2.Start.Y 
+                && seg1.End.X   >= seg2.End.X
+                && seg1.Start.X <= seg2.Start.X
+            | Vertical, Vertical -> 
+                   seg1.Start.X  = seg2.Start.X 
+                && seg1.End.Y   >= seg2.End.Y
+                && seg1.Start.Y <= seg2.Start.Y
+            | _ -> false
+
+        /// Returns true if a segment is visible/ not contained 
+        /// within another segment given a segment list
+        let isSegmentVisible (segments: ASegment list) (seg1: ASegment) =
+            segments 
+            // Used to remove duplicate segments even if in reverse directions
+            |> List.groupBy (fun seg -> (min seg.Start seg.End, max seg.Start seg.End))
+            |> List.collect (fun (_, similarSegments) ->
+                match similarSegments with
+                | [seg] -> [seg]
+                | seg :: _ -> [seg]
+                | _ -> [])
+            |> List.exists (fun seg2 -> seg1 <> seg2 && isContained seg1 seg2)
+            |> not
+
+        /// Combines segments if they are adjacent
+        let combineAdjacentSegments (segments: ASegment list) =
+            let adjacent prv cur = 
+                prv.End.X = cur.Start.X 
+                && prv.End.Y = cur.Start.Y 
+                && prv.Orientation = cur.Orientation 
+
+            let combineSegments seg1 seg2 =
+                { seg1 with End = { X = seg2.End.X; Y = seg2.End.Y }}
+            
+            let adjacentSegments lst seg =
+                match lst with
+                | [] -> [seg]
+                | prevSeg :: tail when adjacent prevSeg seg
+                    -> combineSegments prevSeg seg :: tail
+                | _ -> seg :: lst
+
+            ([], segments)
+            ||> List.fold adjacentSegments
+
+        let boxMap = model |> Optic.get boundingBoxes_
+        let boxes = boxMap |> mapValues |> Array.toList
+        let compIds = boxMap |> mapKeys |> Array.toList
+        let connPortsCount = getConnectedWireIds model.Wire compIds |> List.length |> (*) 2
+        let wires = model |> Optic.get SheetT.wires_ |> mapValues |> Array.toList 
+        let segments = wires |> List.collect getNonZeroAbsSegments 
+        let combSegments = segments |> combineAdjacentSegments
+
+        // Actual number of distinct visible segments
+        // Can't seem to find a away (within reasonable time) 
+        // to convert this into the correct number of intersections
+        // (currently segments already overlap with the block via the ports)
+        let visibleSegmentsCount = 
+            combSegments
+            |> List.length 
+            |> (-) <| connPortsCount
+            |> (fun x -> printfn "Ports: %A " (connPortsCount); x)
+            |> (fun x -> printfn "Segments: %A "  (segments |> List.length) ; x)
+            |> (fun x -> printfn "Filtered Segments: %A "  (segments |> List.filter (isSegmentVisible segments) |> List.length) ; x)
+            |> (fun x -> printfn "Comb Segments: %A " (List.length combSegments); x)
+            |> (fun x -> printfn "Distinct Visible Segments: %A " x; x)
+        
+        segments
+        |> List.map (fun seg -> 
+            List.map (fun box -> segmentIntersectsBoundingBox box seg.Start seg.End) boxes)
+        |> List.filter (List.exists (function Some _float -> true | _ -> false))
+        |> List.length 
+        |> (-) <| connPortsCount
