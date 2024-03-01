@@ -1,6 +1,7 @@
 ﻿module SheetBeautifyHelpers
 open DrawModelType
 open DrawModelType.SymbolT
+open DrawModelType.BusWireT
 open Optics
 open CommonTypes
 open Symbol
@@ -397,10 +398,51 @@ let numVisSegsIntersectingSymbols (model : SheetT.Model) : int =
 
 
 
+let rightAngleSegCount (model : SheetT.Model) : int = 
+    // list of all wires in model
+    let allWiresInSheet = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList 
+    // list of all unique pairs of wires
+    let uniqueWirePairs = createPairs allWiresInSheet
+    //  list of all unique pairs of wires with different nets
+    let uniqueWirePairsDiffNet = uniqueWirePairs |> List.filter (fun (w1, w2) -> w1.OutputPort <> w2.OutputPort)
+    // get all paris of segments of two wires
+    let getSegmentPairsOfWires wire1 wire2 = 
+        let wire1Segments = getNonZeroAbsSegments wire1
+        let wire2Segments = getNonZeroAbsSegments wire2
+        List.allPairs wire1Segments wire2Segments
+    // list of all segment paris within the sheet from different nets
+    let segmentPairsOfWires = List.collect (fun (w1, w2) -> getSegmentPairsOfWires w1 w2) uniqueWirePairsDiffNet
+    // return true if the segment pair is a right angle pair
+    let perpSegmentPair (segment1 : ASegment) (segment2 : ASegment) : bool = 
+        let seg1Dir = segment1.End - segment1.Start
+        let seg2Dir = segment2.End - segment2.Start
+        let dotProd = seg1Dir.X * seg2Dir.X + seg1Dir.Y * seg2Dir.Y
+        match dotProd with
+        | 0.0 -> true
+        | _ -> false
+    
+    let segmentCross (segment1 : ASegment) (segment2 : ASegment) : bool = 
+        overlap1D (segment1.Start.X, segment1.End.X) (segment2.Start.X, segment2.End.X) && overlap1D (segment1.Start.Y, segment1.End.Y) (segment2.Start.Y, segment2.End.Y)
+    
+    segmentPairsOfWires
+    |> List.filter (fun (seg1, seg2) -> perpSegmentPair seg1 seg2 && segmentCross seg1 seg2)
+    |> List.distinct
+    |> List.length
 
 
 
+(*T4*)
 
 
+(*T5*)
 
+let perpWireCount (model : SheetT.Model) : int = 
+    // this is just the number of vectors given by the function visibleSegments that are perpendicular to each other minus 1
+    model.Wire.Wires 
+    |> Map.toSeq 
+    |> Seq.map fst 
+    |> Seq.toList
+    |> List.map (fun x -> visibleSegments x model)
+    |> List.map (fun x -> (List.length x) - 1)
+    |> List.sum
 
