@@ -14,6 +14,10 @@ open Optics
 // Other helpers identified by Team
 
 /// Determines if two 1D intervals have strict overlap.
+/// Strict overlap in the context of geometric intervals typically means that two intervals share at least one common point, and neither interval entirely contains the other. Specifically:
+/// For two intervals A and B:
+/// A strict overlap occurs if there exists a point that is in both A and B.
+
 ///
 /// <param name="intervalA">The first interval specified as a tuple (a1, a2) where a1 and a2 are floats.</param>
 /// <param name="intervalB">The second interval specified as a tuple (b1, b2) where b1 and b2 are floats.</param>
