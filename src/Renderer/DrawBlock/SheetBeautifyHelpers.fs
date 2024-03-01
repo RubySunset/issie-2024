@@ -259,7 +259,7 @@ let flipStateOfSymbolLens_ = Lens.create flipStateOfSymbolGetter flipStateOfSymb
 // T1R : The number of pairs of symbols that intersect each other. See Tick3 for a related
 // function. Count over all pairs of symbols.
 
-// helpers:
+// helpers for T1:
 
 // this fucntion creates a list of par of elements from list that dont have repeated elements (a, a) and dont have mirrored pairs (a, b) and (b, a)
 let createPairs list =
@@ -285,6 +285,34 @@ let PairsOfIntersectingBoxes (model : SheetT.Model) : int =
 // segments.
 
 // use getWire function from BlockHelpers.fs
+// check the functions from BusWireUpdate.fs lines 481 and 471 search for list of wire
+// check the fucntion from BlockHelpers.fs line 228
+// check BlockHelpers.fs line 543. returns None if it does not intersect
+// check BlockHelpers getAbsSegments
+// can get the segment list of a wire using the function in BlockHelpers.fs line 160
+// 
+
+let segIntersectingBB (box : BoundingBox) (segment : BusWireT.ASegment) = 
+    let intersectOption = segmentIntersectsBoundingBox box segment.Start segment.End
+    match intersectOption with
+    | Some _ -> true
+    | None -> false
+
+let numVisSegsIntersectingSymbols (model : SheetT.Model) : int = 
+    // map of bounding boxes
+    let BBMap = model.BoundingBoxes
+    // List of bounding boxes
+    let lstOfBB = BBMap |> Map.toSeq |> Seq.map snd |> Seq.toList
+    let lstOfWires = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList
+    // list of visible segments
+    let lstOfVisibleSegments = lstOfWires |> List.collect (fun wire -> getAbsSegments wire)
+
+    lstOfVisibleSegments
+    |> List.map (fun seg -> lstOfBB |> List.map (fun bb -> (seg, bb)))
+    |> List.map (fun x -> List.map (fun (seg, bb) -> segIntersectingBB bb seg) x)
+    |> List.map (fun x -> List.exists (fun y -> y = true) x)
+    |> List.filter (fun x -> x = true)
+    |> List.length
 
 
 
