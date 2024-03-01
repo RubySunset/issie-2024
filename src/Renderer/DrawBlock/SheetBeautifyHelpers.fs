@@ -479,8 +479,8 @@ let totalVisWireLen (model : SheetT.Model) : float =
             // segments are not parallel, thus cannot overlap
             0.0
     
-    let lenOverlapSegForWires (wires : BusWireT.Wire list) : float =
-        let segments = wires |> List.collect getAbsSegments
+    let lenOverlapSegForWires (ws : BusWireT.Wire list) : float =
+        let segments = ws |> List.collect getAbsSegments
         let uniqueSegmentPairs = createPairs segments
         let overlappingSegments = uniqueSegmentPairs |> List.filter (fun (seg1, seg2) -> measureSegmentOverlap seg1 seg2 > 0.0)
         overlappingSegments |> List.fold (fun acc (seg1, seg2) -> acc + measureSegmentOverlap seg1 seg2) 0.0 
