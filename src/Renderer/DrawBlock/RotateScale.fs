@@ -1,4 +1,6 @@
-﻿module RotateScale
+﻿// Only had time to breifly reoganise some code
+
+module RotateScale
 open CommonTypes
 open DrawModelType
 open DrawModelType.SymbolT
@@ -232,7 +234,8 @@ let optimiseSymbol
             | true -> true, resizedSym
             | _ -> false, sym
 
-        let folder (hAligned, vAligned, sym) ((cid, edge), _) =
+        // HLP 2024 - Ahmæd renamed "folder" to resizeWithAlign
+        let resizeWithAlign (hAligned, vAligned, sym) ((cid, edge), _) =
             let otherSym = Optic.get (symbolOf_ cid) wModel       
 
             match hAligned, vAligned with
@@ -244,7 +247,8 @@ let optimiseSymbol
                 (hAligned, vAligned', resizedSym)
             | _ -> (hAligned, vAligned, sym)
 
-        let (_, _, sym') = ((false, false, sym), symCount) ||> Array.fold folder
+        // HLP 2024 - Ahmæd renamed "folder" to resizeWithAlign
+        let (_, _, sym') = ((false, false, sym), symCount) ||> Array.fold resizeWithAlign 
         sym'
 
     let scaledSymbol =
@@ -276,7 +280,6 @@ let getBlock
 
     {TopLeft = {X = minX; Y = minY}; W = maxX-minX; H = maxY-minY}
 
-
 /// <summary>HLP 23: AUTHOR Ismagilov - Takes a point Pos, a centre Pos, and a rotation type and returns the point flipped about the centre</summary>
 /// <param name="point"> Original XYPos</param>
 /// <param name="center"> The center XYPos that the point is rotated about</param>
@@ -286,17 +289,16 @@ let rotatePointAboutBlockCentre
             (point:XYPos) 
             (centre:XYPos) 
             (rotation:Rotation) = 
+
     let relativeToCentre = (fun x-> x - centre)
-    let rotateAboutCentre (pointIn:XYPos) = 
-        match rotation with 
-        | Degree0 -> 
-            pointIn
-        | Degree90 ->
-            {X = pointIn.Y ; Y = -pointIn.X}
-        | Degree180 -> 
-            {X = -pointIn.X ; Y = - pointIn.Y}
-        | Degree270 ->
-            {X = -pointIn.Y ; Y = pointIn.X}
+
+    // HLP 2024 - Ahmæd made match statement more readable
+    let rotateAboutCentre (pointIn:XYPos) =  
+        match rotation with
+        | Degree0 ->   pointIn
+        | Degree90 ->  {X = pointIn.Y ; Y = -pointIn.X}
+        | Degree180 -> {X = -pointIn.X ; Y = - pointIn.Y}
+        | Degree270 -> {X = -pointIn.Y ; Y = pointIn.X}
            
     let relativeToTopLeft = (fun x-> centre - x)
 
@@ -367,25 +369,22 @@ let rotateSymbolInBlock
         (blockCentre: XYPos)
         (sym: Symbol)  : Symbol =
       
-    let h,w = getRotatedHAndW sym
-
+    // HLP 2024 - Ahmæd reoganised code
+    // took invRotation out as a new variable over calling (invertRotation rotation) 3 times
+    // used if statement for newRotation and newSTransform over match with true and false for readability and consistnecy  
+    let h, w = getRotatedHAndW sym
+    let invRotation = invertRotation rotation // ah121
     let newTopLeft = 
-        rotatePointAboutBlockCentre sym.Pos blockCentre (invertRotation rotation)
-        |> adjustPosForBlockRotation (invertRotation rotation) h w
-
+        rotatePointAboutBlockCentre sym.Pos blockCentre invRotation
+        |> adjustPosForBlockRotation invRotation h w
     let newComponent = { sym.Component with X = newTopLeft.X; Y = newTopLeft.Y}
+    let newRotation = if sym.STransform.Flipped then invRotation else rotation //ah121
+    let newSTransform = {sym.STransform with Rotation = combineRotation newRotation sym.STransform.Rotation} //ah121
     
-    let newSTransform = 
-        match sym.STransform.Flipped with
-        | true -> 
-            {sym.STransform with Rotation = combineRotation (invertRotation rotation) sym.STransform.Rotation}  
-        | _-> 
-            {sym.STransform with Rotation = combineRotation rotation sym.STransform.Rotation}
-
     { sym with 
         Pos = newTopLeft;
         PortMaps = rotatePortInfo rotation sym.PortMaps
-        STransform = newSTransform 
+        STransform = newSTransform
         LabelHasDefaultPos = true
         Component = newComponent
     } |> calcLabelBoundingBox 
@@ -401,7 +400,7 @@ let flipSymbolInBlock
     (blockCentre: XYPos)
     (sym: Symbol) : Symbol =
 
-    let h,w = getRotatedHAndW sym
+    let h, w = getRotatedHAndW sym
     //Needed as new symbols and their components need their Pos updated (not done in regular flip symbol)
     let newTopLeft = 
         flipPointAboutBlockCentre sym.Pos blockCentre flip
@@ -411,15 +410,15 @@ let flipSymbolInBlock
         sym.PortMaps.Orientation |> Map.map (fun id side -> flipSideHorizontal side)
 
     let flipPortList currPortOrder side =
-        currPortOrder |> Map.add (flipSideHorizontal side ) sym.PortMaps.Order[side]
+        currPortOrder |> Map.add (flipSideHorizontal side) sym.PortMaps.Order[side]
 
     let portOrder = 
-        (Map.empty, [Edge.Top; Edge.Left; Edge.Bottom; Edge.Right]) ||> List.fold flipPortList
-        |> Map.map (fun edge order -> List.rev order)       
+        (Map.empty, [Edge.Top; Edge.Left; Edge.Bottom; Edge.Right]) 
+        ||> List.fold flipPortList |> Map.map (fun _edge order -> List.rev order) //_edge ah121
 
     let newSTransform = 
-        {Flipped= not sym.STransform.Flipped;
-        Rotation= sym.STransform.Rotation} 
+        {Flipped = not sym.STransform.Flipped;
+        Rotation = sym.STransform.Rotation} 
 
     let newcomponent = {sym.Component with X = newTopLeft.X; Y = newTopLeft.Y}
 
@@ -428,18 +427,18 @@ let flipSymbolInBlock
         PortMaps = {Order=portOrder;Orientation=portOrientation}
         STransform = newSTransform
         LabelHasDefaultPos = true
-        Pos = newTopLeft
-    }
+        Pos = newTopLeft }
     |> calcLabelBoundingBox
     |> (fun sym -> 
+        // HLP 2024 - Ahmæd reoganised code
+        // used rotateAntiClockByAng over rotateSymbolInBlock
+        // unnecessary need to use get and use newBlockCenter 
+        // unnecessary need to rotateSymbol twice by 270 so just once by 180
+        // Further Improvements given more time would be to rewrite it without 
+        // flips and only adjust the ports and edges
         match flip with
-        | FlipHorizontal -> sym
-        | FlipVertical -> 
-            let newblock = getBlock [sym]
-            let newblockCenter = newblock.Centre()
-            sym
-            |> rotateSymbolInBlock Degree270 newblockCenter 
-            |> rotateSymbolInBlock Degree270 newblockCenter)
+        | FlipHorizontal -> sym 
+        | FlipVertical -> sym |> rotateAntiClockByAng Degree180) // ah121
 
 /// <summary>HLP 23: AUTHOR Ismagilov - Scales selected symbol up or down.</summary>
 /// <param name="scaleType"> Scale up or down. Scaling distance is constant</param>

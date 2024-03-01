@@ -189,6 +189,12 @@ let update (msg : Msg) (issieModel : ModelType.Model): ModelType.Model*Cmd<Model
         | Down -> mDownUpdate model mMsg
         | Drag -> 
             //printfn "running sheet.update"
+            // printfn "Symbol Count = %A" <| SheetBeautifyHelpers.Testers.intersectingSymbolPairsCount model
+            // printfn "Segment Count = %A" <| SheetBeautifyHelpers.Testers.visibleSegmentIntersectCount model
+            printfn "Crossing Count = %A" <| SheetBeautifyHelpers.Testers.crossingSegmentPairsCount model
+            printfn "--------------------------------------------------"
+            // printfn "Vis %A" model.Wire
+            // printfn "Vis = %A" <| SheetBeautifyHelpers.IndividualPhaseWork.numVisSegsIntersectingSymbols model
             mDragUpdate model mMsg
         | Up -> mUpUpdate model mMsg
         | Move -> mMoveUpdate model mMsg
