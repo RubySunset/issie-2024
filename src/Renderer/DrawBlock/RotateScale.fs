@@ -131,7 +131,22 @@ let getPortAB (model : Model) (wireSyms : WireSymbols) : Port * Port =
     let ports = portsOfWires model [ wireSyms.Wire ]
     let portA = filterPortBySym ports wireSyms.SymA |> List.head
     let portB = filterPortBySym ports wireSyms.SymB |> List.head
-    portA, portB
+    portA, portB 
+
+
+// The proposed fucntion which gets rid of the runtime exception by using Option type to return the result.
+// This causes changes in the getOppEdgePortInfo function and a new type signature need to me made, plus
+// a match expression needs to be used to get the values from getPortAB. 
+// Subsequent functions like alignSymbols and reSizeSymbol need to be changed to accomodate the changes in the fucntion getPortAB,
+// due to type signatures.
+
+// let getPortAB (model : Model) (wireSyms : WireSymbols) : Option<Port * Port> =
+//     let ports = portsOfWires model [ wireSyms.Wire ]
+//     let portA = filterPortBySym ports wireSyms.SymA |> List.tryHead
+//     let portB = filterPortBySym ports wireSyms.SymB |> List.tryHead
+//     match portA, portB with
+//     | Some pA, Some pB -> Some (pA, pB)
+//     | _ -> None
 
 /// <summary>
 /// Attempts to identify and return information for two ports located on opposite edges of two symbols connected by a wire.
