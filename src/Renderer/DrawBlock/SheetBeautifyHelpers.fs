@@ -432,17 +432,92 @@ let rightAngleSegCount (model : SheetT.Model) : int =
 
 
 (*T4*)
+// for this one you would want to use getAbsSegments \
+
+let totalVisWireLen (model : SheetT.Model) : float = 
+    let lstSegments = model.Wire.Wires |> Map.toSeq |> Seq.map snd |> Seq.toList |> List.collect getAbsSegments
+
+    let sumSegmentLength = lstSegments |> List.fold (fun acc segment -> acc + segment.Segment.Length) 0.0
+
+    // grouping wires into sublist based on their outputports, which is helpful later for handling same-net segment overlapping
+    let partitionedWireIntoNets = BlockHelpers.partitionWiresIntoNets model.Wire
+
+
+
+
+    // TODO: make these functions helper functions to make the code more readable
+    // if two segments intersect and are not perperndicular to eachother then they overlap
+    // copied from T3
+    // these were initially used for a different approach to solve T4
+    // let segmentCross (segment1 : ASegment) (segment2 : ASegment) : bool = 
+    //     overlap1D (segment1.Start.X, segment1.End.X) (segment2.Start.X, segment2.End.X) && overlap1D (segment1.Start.Y, segment1.End.Y) (segment2.Start.Y, segment2.End.Y)
+    // let perpSegmentPair (segment1 : ASegment) (segment2 : ASegment) : bool = 
+    //     let seg1Dir = segment1.End - segment1.Start
+    //     let seg2Dir = segment2.End - segment2.Start
+    //     let dotProd = seg1Dir.X * seg2Dir.X + seg1Dir.Y * seg2Dir.Y
+    //     match dotProd with
+    //     | 0.0 -> true
+    //     | _ -> false
+
+    // Helper function to calculate the overlap between two 1D segments on the same axis
+    let calculateOverlap (start1 : float) (end1 : float) (start2 : float) (end2 : float) = 
+        let sortedPoints = [start1; end1; start2; end2] |> List.sort
+        let overlapStart = max start1 start2
+        let overlapEnd = min end1 end2
+        max 0.0 (overlapEnd - overlapStart)
+    
+    let measureSegmentOverlap (segment1 : ASegment) (segment2 : ASegment) =
+        //check id both segments are vertical or horizontal
+        if (segment1.Start.X = segment1.End.X && segment2.Start.X = segment2.End.X) || (segment1.Start.Y = segment1.End.Y && segment2.Start.Y = segment2.End.Y) then
+            if segment1.Start.X = segment1.End.X then
+                // if both are vertical, calculate Y overlap
+                calculateOverlap segment1.Start.Y segment1.End.Y segment2.Start.Y segment2.End.Y
+            else 
+                // segments are horizontal, calculate X overlap
+                calculateOverlap segment1.Start.X segment1.End.X segment2.Start.X segment2.End.X
+        else
+            // segments are not parallel, thus cannot overlap
+            0.0
+    
+    let lenOverlapSegForWires (wires : BusWireT.Wire list) : float =
+        let segments = wires |> List.collect getAbsSegments
+        let uniqueSegmentPairs = createPairs segments
+        let overlappingSegments = uniqueSegmentPairs |> List.filter (fun (seg1, seg2) -> measureSegmentOverlap seg1 seg2 > 0.0)
+        overlappingSegments |> List.fold (fun acc (seg1, seg2) -> acc + measureSegmentOverlap seg1 seg2) 0.0 
+    
+    let sumOverlapSegments = partitionedWireIntoNets |> List.map snd |> List.map (List.map snd) |> List.map lenOverlapSegForWires |> List.sum
+
+    sumSegmentLength - sumOverlapSegments
+
+
+
+
+    
+    
+
+    
+
+
+    
+
+
 
 
 (*T5*)
 
 let perpWireCount (model : SheetT.Model) : int = 
-    // this is just the number of vectors given by the function visibleSegments that are perpendicular to each other minus 1
-    model.Wire.Wires 
-    |> Map.toSeq 
-    |> Seq.map fst 
-    |> Seq.toList
-    |> List.map (fun x -> visibleSegments x model)
-    |> List.map (fun x -> (List.length x) - 1)
-    |> List.sum
+    // this is just the number of vectors given by the function visibleSegments which are perpendicular to each other hence there would be 
+    // the length of this list minus 1 wire right-angles
+
+    let conIdList = model.Wire.Wires |> Map.toSeq |> Seq.map fst |> Seq.toList
+    // use this list to extract the list of visible segments per wire
+    let visSegLstPerWire = conIdList |> List.map (fun conId -> visibleSegments conId model)
+    // for each list representing a wire get the length - 1 which shows wire right angles
+    let wireRightAngles = visSegLstPerWire |> List.map (fun x -> (List.length x) - 1)
+    // return the sum of this list 
+    wireRightAngles |> List.sum
+
+
+(*T6*)
+
 
