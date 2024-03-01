@@ -202,9 +202,7 @@ let getVisibleWireSymbolIntersect (sheet: SheetT.Model) =
     |> List.length
 
 
-let rec uniqueListPairs (lst: 'a list) 
-    //: ('a*'a) list 
-    =
+let rec uniqueListPairs (lst: 'a list) : ('a*'a) list =
     match lst with
     | [] -> []
     | hd::tl ->
@@ -213,10 +211,8 @@ let rec uniqueListPairs (lst: 'a list)
 
 // T3R
 /// Number of distinct visible segments that intersect each other at right angles.
-let segmentsIntersectingRightAngle (sheet: SheetT.Model) 
-    // : int 
-    =
-    // Returns 0 if segment is horizontal, 1 if it is vertical, or 2 otherwise
+let segmentsIntersectingRightAngle (sheet: SheetT.Model) : int =
+    // Returns 0 if segment is horizontal, 1 if it is vertical
     let segmentOrientation (seg: XYPos*XYPos) =
         let startSeg = fst seg
         let endSeg = snd seg
