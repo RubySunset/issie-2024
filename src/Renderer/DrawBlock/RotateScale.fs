@@ -1,4 +1,14 @@
-﻿module RotateScale
+﻿(*
+My improvements for rotatescale were done in the original line number of 474-579. These have changed with these comments,
+but where my improvements begin is also marked by the line:
+//--------------- Where my improvements begin ---------------//
+
+
+
+*)
+
+
+module RotateScale
 open CommonTypes
 open DrawModelType
 open DrawModelType.SymbolT
@@ -471,7 +481,9 @@ let scaleSymbolInBlock
     {sym with Pos = newPos; Component=newComponent; LabelHasDefaultPos=true}
 
 
+//--------------- Where my improvements begin ---------------//
 /// HLP 23: AUTHOR Klapper - Rotates a symbol based on a degree, including: ports and component parameters.
+/// The rotation degree can only be a fixed multiple of 90 degrees.
 
 let rotateSymbolByDegree (degree: Rotation) (sym:Symbol)  =
     let pos = {X = sym.Component.X + sym.Component.W / 2.0 ; Y = sym.Component.Y + sym.Component.H / 2.0 }
@@ -540,11 +552,8 @@ let getScalingFactorAndOffsetCentre (min:float) (matchMin:float) (max:float) (ma
 let getScalingFactorAndOffsetCentreGroup
     (matchBBMin:XYPos)
     (matchBBMax:XYPos)
-    (selectedSymbols: Symbol list) : ((float * float) * (float * float)) = 
-    //(compList: ComponentId list)
-    //(model: SymbolT.Model)
-
-    //let selectedSymbols = List.map (fun x -> model.Symbols |> Map.find x) compList
+    (selectedSymbols: Symbol list) 
+    : ((float * float) * (float * float)) = 
 
     let maxXSym = 
             selectedSymbols
@@ -577,6 +586,8 @@ let getScalingFactorAndOffsetCentreGroup
     let xSC = getScalingFactorAndOffsetCentre oldMinX newMinX oldMaxX newMaxX
     let ySC = getScalingFactorAndOffsetCentre oldMinY newMinY oldMaxY newMaxY
     (xSC, ySC)
+
+//--------------- Where my improvements end ---------------//
 
 /// Alter position of one symbol as needed in a scaling operation
 let scaleSymbol
