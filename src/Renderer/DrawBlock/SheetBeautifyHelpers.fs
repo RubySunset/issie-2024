@@ -14,9 +14,7 @@ open Optics
 // Other helpers identified by Team
 
 /// Determines if two 1D intervals have strict overlap.
-/// Strict overlap in the context of geometric intervals typically means that two intervals share at least one common point, and neither interval entirely contains the other. Specifically:
-/// For two intervals A and B:
-/// A strict overlap occurs if there exists a point that is in both A and B.
+/// Strict overlap in the context of Issie checks if a full overlap happens and not just 2 segments touching at a single point
 
 ///
 /// <param name="intervalA">The first interval specified as a tuple (a1, a2) where a1 and a2 are floats.</param>
@@ -248,13 +246,13 @@ let aSegmentIntersectsAnyBoundingBoxed (aSegment :ASegment) ( boundingBoxes :Lis
        |>List.isEmpty
 
 
-/// Gets the dimensions (height, width) of a custom component from a Symbol.
+/// Gets the dimensions (height, width) of a custom component from a Symbol. (B1R)
 ///
 /// <param name="symbol">The Symbol representing the custom component.</param>
 /// <returns>Returns a tuple (height, width) representing the dimensions of the custom component.</returns>
 let getDimensionOfComponent (symbol : SymbolT.Symbol) = (symbol.Component.H,symbol.Component.W)
 
-/// Sets the dimensions (height, width) of a custom component in a Symbol.
+/// Sets the dimensions (height, width) of a custom component in a Symbol. (B1W)
 /// <param name="H">The new height value for the custom component.</param>
 /// <param name="W">The new width value for the custom component.</param>
 /// <param name="symbol">The Symbol representing the custom component.</param>
@@ -264,7 +262,7 @@ let setDimensionOfComponent  (H:float,W:float) (symbol:SymbolT.Symbol) = setCust
 /// Lens for accessing and modifying the dimensions (height, width) of a custom component in a Symbol.
 let customComponentDimension_ = Lens.create getDimensionOfComponent setDimensionOfComponent
 
-/// Sets the position (X, Y) of a Symbol.
+/// Sets the position (X, Y) of a Symbol. (B2W)
 ///
 /// <param name="symbol">The Symbol to be repositioned.</param>
 /// <param name="x">The new X-coordinate for the Symbol's position.</param>
@@ -275,14 +273,14 @@ let setPositionOfSymbol (symbol : SymbolT.Symbol) (x:float) (y:float) =
 
 
 
-/// Gets the ports associated with a specific edge in a Symbol.
+/// Gets the ports associated with a specific edge in a Symbol. (B3R)
 ///
 /// <param name="symbol">The Symbol containing port information.</param>
 /// <param name="edge">The Edge for which ports are retrieved.</param>
 /// <returns>Returns a list of ports associated with the specified edge in the Symbol.</returns>
 let getPortsOfSymbol (edge : Edge) (symbol : SymbolT.Symbol) = symbol.PortMaps.Order[edge]
 
-/// Sets the ports for a specific edge in a Symbol.
+/// Sets the ports for a specific edge in a Symbol. (B3W)
 ///
 /// <param name="symbol">The Symbol to be updated with new port information.</param>
 /// <param name="edge">The Edge for which ports are set.</param>
@@ -297,7 +295,7 @@ let setPortsOfSymbol (symbol:SymbolT.Symbol) (edge : Edge) (ports : List<string>
     }
 
 
-/// Gets the reverse state of the input ports for a Mux2 symbol.
+/// Gets the reverse state of the input ports for a Mux2 symbol. (B4R)
 ///
 /// <param name="symbol">The Mux2 symbol to retrieve the reverse state from.</param>
 /// <returns>Returns true if the input ports are reversed; otherwise, false.</returns>
@@ -305,7 +303,7 @@ let getReverseStateOfMux2 (symbol :SymbolT.Symbol) = Option.defaultValue false s
 
 /// Sets the reverse state of the input ports for a Mux2 symbol.
 ///
-/// <param name="state">The new reverse state to set for the input ports.</param>
+/// <param name="state">The new reverse state to set for the input ports.</param> (B4W)
 /// <param name="symbol">The Mux2 symbol to be updated with the new reverse state.</param>
 /// <returns>Returns a new Mux2 symbol with the updated reverse state for the input ports.</returns>
 let setReverseStateOfMux2  (state : bool) (symbol :SymbolT.Symbol) =
@@ -315,7 +313,7 @@ let setReverseStateOfMux2  (state : bool) (symbol :SymbolT.Symbol) =
 let reverseStateMux2_ = Lens.create getReverseStateOfMux2 setReverseStateOfMux2
 
 
-/// Gets the absolute position on the sheet of a specific port within a Symbol.
+/// Gets the absolute position on the sheet of a specific port within a Symbol. (B5R)
 ///
 /// <param name="port">The Port for which to retrieve the position.</param>
 /// <param name="symbol">The Symbol containing the specified port.</param>
@@ -323,19 +321,19 @@ let reverseStateMux2_ = Lens.create getReverseStateOfMux2 setReverseStateOfMux2
 let getPortPosition (port : Port) (symbol : SymbolT.Symbol) =
      symbol.Pos + getPortPos symbol port
 
-/// Gets the outline of the bounding box for a Symbol.
+/// Gets the outline of the bounding box for a Symbol. (B6R)
 ///
 /// <param name="symbol">The Symbol for which to retrieve the bounding box outline.</param>
 /// <returns>Returns the bounding box outline for the specified Symbol.</returns>
 let getSymbolBoundingBoxOutline (symbol :SymbolT.Symbol) = getSymbolBoundingBox symbol
 
-/// Gets the rotation state of a Symbol.
+/// Gets the rotation state of a Symbol. (B7R)
 ///
 /// <param name="symbol">The Symbol for which to retrieve the rotation state.</param>
 /// <returns>Returns the rotation state of the specified Symbol.</returns>
 let getRotationState (symbol :SymbolT.Symbol) = symbol.STransform.Rotation
 
-/// Sets the rotation state for a Symbol.
+/// Sets the rotation state for a Symbol. (B7W)
 ///
 /// <param name="rotation">The new rotation state to set for the Symbol.</param>
 /// <param name="symbol">The Symbol to be updated with the new rotation state.</param>
@@ -346,7 +344,7 @@ let setRotationState  (rotation : Rotation) (symbol :SymbolT.Symbol) = {symbol w
 /// Lens for accessing and modifying the rotation state of a Symbol
 let rotationState_ = Lens.create getRotationState setRotationState
 
-/// Gets the flipped state of a Symbol.
+/// Gets the flipped state of a Symbol. (B8R)
 ///
 /// <param name="symbol">The Symbol for which to retrieve the flipped state.</param>
 /// <returns>Returns true if the Symbol is flipped; otherwise, false.</returns>
@@ -354,7 +352,7 @@ let getFlippedState (symbol :SymbolT.Symbol) = symbol.STransform.Flipped
 
 /// Sets the flipped state for a Symbol.
 ///
-/// <param name="flip">The new flipped state to set for the Symbol.</param>
+/// <param name="flip">The new flipped state to set for the Symbol.</param> (B8W)
 /// <param name="symbol">The Symbol to be updated with the new flipped state.</param>
 /// <returns>Returns a new Symbol with the updated flipped state.</returns>
 let setFlippedState  (flip : bool) (symbol :SymbolT.Symbol) = {symbol with SymbolT.Symbol.STransform={symbol.STransform with Flipped =  flip  }}
@@ -364,7 +362,7 @@ let setFlippedState  (flip : bool) (symbol :SymbolT.Symbol) = {symbol with Symbo
 let flippedState_ = Lens.create getFlippedState setFlippedState
 
 
-/// Counts the number of pairs of symbols that intersect each other in the given sheet.
+/// Counts the number of pairs of symbols that intersect each other in the given sheet. (T1R)
 ///
 /// This function considers all pairs of symbols in the sheet and calculates the
 /// distinct number of pairs where the symbols intersect.
@@ -380,7 +378,7 @@ let numOfPairOfSymbolsIntersecting (sheet :SheetT.Model) =
     |>List.length
 
 
-/// Counts the number of distinct wire visible segments that intersect with one or more symbols.
+/// Counts the number of distinct wire visible segments that intersect with one or more symbols. (T2R)
 ///
 /// This function considers all visible wire segments in the sheet and calculates
 /// the number of segments that intersect with one or more symbols.
@@ -395,11 +393,7 @@ let  numOfSymbolSegmentsIntersecting(sheet:SheetT.Model) =
     |> List.distinct
     |>List.length
 
-
-
-
-
-/// Counts the number of segment pairs crossing in the given sheet.
+/// Counts the number of segment pairs crossing in the given sheet. (T3R)
 ///
 /// This function considers all visible wire segments in the sheet and calculates
 /// the number of pairs of segments that cross each other, considering both the same
@@ -427,7 +421,7 @@ let numOfSegmentPairsCrossing (sheet :SheetT.Model)=
 
     sameNetCount+diffNetCount
 
-/// Calculates the total length of visible wire segments in the given sheet.
+/// Calculates the total length of visible wire segments in the given sheet. (T4R)
 ///
 /// This function considers all visible wire segments in the sheet and calculates
 /// the total length of these segments.
@@ -451,7 +445,7 @@ let totalVisibleWireLength (sheet :SheetT.Model)=
     |>List.sum
 
 
-///  The total number of visible right-angles in wires in the given sheet.
+///  The total number of visible right-angles in wires in the given sheet. (T5R)
 /// <param name="sheet">The sheet model containing wire segments.</param>
 /// <returns>Returns the total number of visible right-angles in wires</returns>
 let numOfVisibleRightAngles (sheet :SheetT.Model)=
@@ -469,7 +463,7 @@ let numOfVisibleRightAngles (sheet :SheetT.Model)=
     |>List.length
 
 
-/// Finds and categorizes retracing wire segments in the given sheet.
+/// Finds and categorizes retracing wire segments in the given sheet. (T6R)
 ///
 /// Retracing segments are identified as zero-length segments in a wire with non-zero segments
 /// on either side that have lengths of opposite signs. This function partitions all wire segments
@@ -496,30 +490,34 @@ let findRetracingSegments (sheet :SheetT.Model) =
         |>Map.values
         |>Seq.toList
         |>List.map getAbsSegments
-
     let allASegmentsPartitioned = allASegments
                                 |>List.map (List.windowed 3)
 
-    let allRetracingSegments =
-                                                allASegmentsPartitioned
-                                                |> List.map (fun outerList ->
-                                                    outerList
-                                                    |> List.filter doesRetrace)
-                                                |> List.collect (List.collect id)
 
-    let allStartingSegments= List.map (List.map List.head ) allASegmentsPartitioned
-    let allEndingSegments= List.map (List.map List.last ) allASegmentsPartitioned
+    let allRetracingSegments =
+        allASegmentsPartitioned
+        |> List.map (fun outerList ->
+            outerList
+                |> List.filter doesRetrace)
+        |> List.collect id
+
+
+    let allStartingSegments= List.map (List.map (List.item 1 )) allASegmentsPartitioned
+    let allEndingSegments= List.map (List.map (fun segList -> List.item (List.length segList - 2) segList)) allASegmentsPartitioned
+
     let intersectingStartSegmentsWithSymbols = allStartingSegments
                                                |> List.filter doesRetrace
                                                |>List.map List.last
                                                |>List.filter ( fun aSegment -> aSegmentIntersectsAnyBoundingBoxed aSegment symbolsBoundingBoxes)
 
-    let intersectingEndSegmentsWithSymbols = allStartingSegments
+    let intersectingEndSegmentsWithSymbols = allEndingSegments
                                                |> List.filter doesRetrace
                                                |>List.map List.head
                                                |>List.filter ( fun aSegment -> aSegmentIntersectsAnyBoundingBoxed aSegment symbolsBoundingBoxes)
 
     (allRetracingSegments , intersectingStartSegmentsWithSymbols@intersectingEndSegmentsWithSymbols)
+
+
 
 
 
