@@ -3,12 +3,14 @@ open GenerateData
 open Elmish
 
 
-//-------------------------------------------------------------------------------------------//
-//--------Types to represent tests with (possibly) random data, and results from tests-------//
-//-------------------------------------------------------------------------------------------//
-module TestLib =
+//--------------------------------------------------------------------//
+//--------Types to represent tests with (possibly) random data--------// 
+//-----------------------and results from tests-----------------------//
+//--------------------------------------------------------------------//
 
-    /// convenience unsafe function to extract Ok part of Result or fail if value is Error
+module TestLib =
+    /// convenience unsafe function\
+    /// extracts Ok part of Result, or fail if value is Error
     let getOkOrFail (res: Result<'a,string>) =
         match res with
         | Ok x -> x
@@ -17,8 +19,8 @@ module TestLib =
 
 
     type TestStatus =
-            | Fail of string
-            | Exception of string
+        | Fail of string
+        | Exception of string
 
     type Test<'a> = {
         Name: string
@@ -43,7 +45,7 @@ module TestLib =
         with
             | e ->
                 Error ($"Exception when running {name}\n" + e.StackTrace)
-            
+
     /// Run the Test samples from 0 up to test.Size - 1.
     /// The return list contains all failures or exceptions: empty list => everything has passed.
     /// This will always run to completion: use truncate if text.Samples.Size is too large.
@@ -52,25 +54,32 @@ module TestLib =
         |> List.map (fun n ->
                 catchException $"generating test {n} from {test.Name}" test.Samples.Data n
                 |> (fun res -> n,res)
-           )           
-        |> List.collect (function
-                            | n, Error mess -> [n, Exception mess]
-                            | n, Ok sample ->
-                                match catchException $"'test.Assertion' on test {n} from 'runTests'" (test.Assertion n) sample with
-                                | Ok None -> []
-                                | Ok (Some failure) -> [n,Fail failure]
-                                | Error (mess) -> [n,Exception mess])
-        |> (fun resL ->                
-                {
+           )  // sample # -> (sample #, Result<sample value?>)
+           // sample value obtained from data, that Gen.fromArray was called on
+        |> List.collect (
+            function
+                // convert Errors to Exceptions (TestStatus-type)
+                | n, Error mess -> [n, Exception mess]
+                // if there is a sample to work with
+                | n, Ok sample ->  
+                    match catchException $"'test.Assertion' on test {n} from 'runTests'" (test.Assertion n) sample with
+                    | Ok None -> []  // no exception occured :D
+                    // no exception, but assertion failed :(
+                    | Ok (Some failure) -> [n,Fail failure]
+                    // exception occured :(((
+                    | Error (mess) -> [n,Exception mess]
+        )
+        |> (fun resL -> // takes list of results    
+                {  // looks very similar to the Test record
                     TestName = test.Name
                     FirstSampleTested = test.StartFrom
                     TestData = test.Samples
-                    TestErrors =  resL
-                })
+                    TestErrors =  resL  // passing all tests results in []
+                })  // returns TestResult record
  
  
             
-(******************************************************************************************
+(*******************************************************************************
    This submodule contains a set of functions that enable random data generation
    for property-based testing of Draw Block wire routing functions.
    basic idea.
@@ -78,7 +87,7 @@ module TestLib =
    2. For each layout apply smartautoroute to regenerate all wires
    3. Apply check functions to see if the resulting wire routing obeys "good layout" rules.
    4. Output any layouts with anomalous wire routing
-*******************************************************************************************)
+*******************************************************************************)
 module HLPTick3 =
     open EEExtensions
     open Optics
@@ -108,7 +117,7 @@ module HLPTick3 =
     let maxSheetCoord = Sheet.Constants.defaultCanvasSize
     let middleOfSheet = {X=maxSheetCoord/2.;Y=maxSheetCoord/2.}
 
-    /// Used throughout to compare labels since these are case invariant "g1" = "G1"
+    /// Used throughout to compare labels, as these are case invariant "g1" = "G1"
     let caseInvariantEqual str1 str2 =
         String.toUpper str1 = String.toUpper str2
  
@@ -125,9 +134,10 @@ module HLPTick3 =
         {Label=label; PortNumber = number}
 
 
-    //-----------------------------------------------------------------------------------------------
-    // visibleSegments is included here as ahelper for info, and because it is needed in project work
-    //-----------------------------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    // visibleSegments is included here as a helper for info
+    // and because it is needed in project work
+    //--------------------------------------------------------------------------
 
     /// The visible segments of a wire, as a list of vectors, from source end to target end.
     /// Note that in a wire with n segments a zero length (invisible) segment at any index [1..n-2] is allowed 
@@ -168,18 +178,10 @@ module HLPTick3 =
                 ||> List.fold tryCoalesceAboutIndex)
 
 
-//------------------------------------------------------------------------------------------------------------------------//
-//------------------------------functions to build issue schematics programmatically--------------------------------------//
-//------------------------------------------------------------------------------------------------------------------------//
+//----------------------------------------------------------------------------//
+//------------functions to build issue schematics programmatically------------//
+//----------------------------------------------------------------------------//
     module Builder =
-
-
-                
-
-            
-
-
-
         /// Place a new symbol with label symLabel onto the Sheet with given position.
         /// Return error if symLabel is not unique on sheet, or if position is outside allowed sheet coordinates (0 - maxSheetCoord).
         /// To be safe place components close to (maxSheetCoord/2.0, maxSheetCoord/2.0).
@@ -200,7 +202,6 @@ module HLPTick3 =
                 |> SheetUpdateHelpers.updateBoundingBoxes // could optimise this by only updating symId bounding boxes
                 |> Ok
         
-
 
     
         /// Place a new symbol onto the Sheet with given position and scaling (use default scale if this is not specified).
@@ -233,15 +234,19 @@ module HLPTick3 =
                     }
                 placeSymbol symLabel (Custom ccType) position model
             
-        
 
+(*  // TODO: make this work, yeah?
         // Rotate a symbol
         let rotateSymbol (symLabel: string) (rotate: Rotation) (model: SheetT.Model) : (SheetT.Model) =
-            failwithf "Not Implemented"
+            let symbol: SymbolT.Symbol = symLabel |> model.Wire.Symbol.Symbols
 
+            SymbolResizeHelpers.rotateSymbol rotate symbol
+            |> Optic.set symbolModel_ (model.Wire.Symbol |> SymbolUpdate.updateSymbol symbol)
+            // TODO: write this up a bit
+*)
         // Flip a symbol
         let flipSymbol (symLabel: string) (flip: SymbolT.FlipType) (model: SheetT.Model) : (SheetT.Model) =
-            failwithf "Not Implemented"
+            failwithf "Not Implemented"  // TODO: Implement
 
         /// Add a (newly routed) wire, source specifies the Output port, target the Input port.
         /// Return an error if either of the two ports specified is invalid, or if the wire duplicates and existing one.
@@ -319,15 +324,29 @@ module HLPTick3 =
                 | Ok sheet -> showSheetInIssieSchematic sheet dispatch
                 | Error mess -> ()
             result
-//--------------------------------------------------------------------------------------------------//
-//----------------------------------------Example Test Circuits using Gen<'a> samples---------------//
-//--------------------------------------------------------------------------------------------------//
+
+
+//---------------------------------------------------------------------------//
+//----------------Example Test Circuits using Gen<'a> samples----------------//
+//---------------------------------------------------------------------------//
 
     open Builder
     /// Sample data based on 11 equidistant points on a horizontal line
     let horizLinePositions =
         fromList [-100..20..100]
         |> map (fun n -> middleOfSheet + {X=float n; Y=0.})
+    
+    /// Sample data based on 11 equidistant points on a vertical line
+    /// went through quite a few variations, but 11 same as above seemed optimal
+    let verticalLinePositions =
+        fromList [-100..20..100]  
+        // anything further apart would basically be equivalent
+        |> map (fun n -> middleOfSheet + {X=0.; Y=float n})
+
+    // Sample data based on 55 equidistant points on a 200x300 grid
+    let gridPositions =
+        product (fun (x: XYPos) (y: XYPos) -> {X=x.X; Y=y.Y}) horizLinePositions verticalLinePositions
+
 
     /// demo test circuit consisting of a DFF & And gate
     let makeTest1Circuit (andPos:XYPos) =
@@ -338,12 +357,19 @@ module HLPTick3 =
         |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0) )
         |> getOkOrFail
 
+    
+    /// test circuit with a DFF & And gate, but only one wire
+    let makeWireTestCircuit (andPos:XYPos) =
+        initSheetModel
+        |> placeSymbol "G1" (GateN(And,2)) andPos
+        |> Result.bind (placeSymbol "FF1" DFF middleOfSheet)
+        |> Result.bind (placeWire (portOf "G1" 0) (portOf "FF1" 0))
+        |> getOkOrFail
 
 
-//------------------------------------------------------------------------------------------------//
-//-------------------------Example assertions used to test sheets---------------------------------//
-//------------------------------------------------------------------------------------------------//
-
+//----------------------------------------------------------------------------//
+//-------------------Example assertions used to test sheets-------------------//
+//----------------------------------------------------------------------------//
 
     module Asserts =
 
@@ -352,9 +378,10 @@ module HLPTick3 =
            easy to document tests and so that any specific sampel schematic can easily be displayed using failOnSampleNumber. *)
 
         /// Ignore sheet and fail on the specified sample, useful for displaying a given sample
-        let failOnSampleNumber (sampleToFail :int) (sample: int) _sheet =
-            if sampleToFail = sample then
-                Some $"Failing forced on Sample {sampleToFail}."
+        /// I've taken the liberty of refactoring for readability
+        let failOnSampleNumber (sample: int) (sampleToFailOn :int) _sheet =
+            if sample = sampleToFailOn then
+                Some $"Failing forced on Sample {sample}."
             else
                 None
 
@@ -383,15 +410,28 @@ module HLPTick3 =
                          | false -> None)
 
 
+//--------------------------------------------------------------------//
+//--------Functions that filter sample values based on certain--------// 
+//-----------------------------conditions-----------------------------//
+//--------------------------------------------------------------------//
 
-//---------------------------------------------------------------------------------------//
-//-----------------------------Demo tests on Draw Block code-----------------------------//
-//---------------------------------------------------------------------------------------//
+    module Filters =
+        /// Filter out any samples where the symbols intersect
+        let symbolIntersectionFilter circuitMaker (positions: Gen<XYPos>) =
+            [0..positions.Size-1]
+            |> List.map (fun n -> n, circuitMaker (positions.Data n))
+            |> List.filter (fun (n, model) -> (Asserts.failOnSymbolIntersectsSymbol n model) = None)
+            |> List.map (fun (n,_) -> positions.Data n)
+            |> fromList
+
+
+//---------------------------------------------------------------------------//
+//-----------------------Demo tests on Draw Block code-----------------------//
+//---------------------------------------------------------------------------//
 
     module Tests =
 
-        /// Allow test errors to be viewed in sequence by recording the current error
-        /// in the Issie Model (field DrawblockTestState). This contains all Issie persistent state.
+        /// Allow test errors to be viewed in sequence by recording the current error in the Issie Model (field DrawblockTestState). This contains all Issie persistent state.
         let recordPositionInTest (testNumber: int) (dispatch: Dispatch<Msg>) (result: TestResult<'a>) =
             dispatch <| UpdateDrawBlockTestState(fun _ ->
                 match result.TestErrors with
@@ -401,7 +441,7 @@ module HLPTick3 =
                 | (numb, _) :: _ ->
                     printf $"Sample {numb}"
                     Some { LastTestNumber=testNumber; LastTestSampleIndex= numb})
-            
+
         /// Example test: Horizontally positioned AND + DFF: fail on sample 0
         let test1 testNum firstSample dispatch =
             runTestOnSheets
@@ -446,6 +486,20 @@ module HLPTick3 =
                 dispatch
             |> recordPositionInTest testNum dispatch
 
+        
+        /// Horizontally positioned AND + DFF: fail on wires intersecting symbols
+        let testWireRouting testNum firstSample dispatch =
+            let filteredGridPositions = 
+                Filters.symbolIntersectionFilter makeTest1Circuit gridPositions 
+            runTestOnSheets
+                "Horizontally positioned AND + DFF: fail on wires intersecting symbols"
+                firstSample
+                filteredGridPositions
+                makeWireTestCircuit
+                Asserts.failOnAllTests //Asserts.failOnWireIntersectsSymbol
+                dispatch
+            |> recordPositionInTest testNum dispatch
+
         /// List of tests available which can be run ftom Issie File Menu.
         /// The first 9 tests can also be run via Ctrl-n accelerator keys as shown on menu
         let testsToRunFromSheetMenu : (string * (int -> int -> Dispatch<Msg> -> Unit)) list =
@@ -456,12 +510,11 @@ module HLPTick3 =
                 "Test2", test2 // example
                 "Test3", test3 // example
                 "Test4", test4 
-                "Test5", fun _ _ _ -> printf "Test5" // dummy test - delete line or replace by real test as needed
+                "Test5", testWireRouting // dummy test - delete line or replace by real test as needed
                 "Test6", fun _ _ _ -> printf "Test6"
                 "Test7", fun _ _ _ -> printf "Test7"
                 "Test8", fun _ _ _ -> printf "Test8"
                 "Next Test Error", fun _ _ _ -> printf "Next Error:" // Go to the nexterror in a test
-
             ]
 
         /// Display the next error in a previously started test
@@ -480,14 +533,10 @@ module HLPTick3 =
             match name, model.DrawBlockTestState with
             | "Next Test Error", Some state ->
                 nextError testsToRunFromSheetMenu[state.LastTestNumber] (state.LastTestSampleIndex+1) dispatch
+                // SampleIndex of prev. test + 1: next error
             | "Next Test Error", None ->
                 printf "Test Finished"
                 ()
             | _ ->
                 func testIndex 0 dispatch
         
-
-
-    
-
-
