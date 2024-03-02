@@ -6,6 +6,7 @@
 
 module Lenses =
     open Optics
+    open Optics.Operators
     open CommonTypes
     open DrawModelType
     open DrawModelType.SymbolT
@@ -49,23 +50,52 @@ module Lenses =
 
 
     /// takes in a sheet model, a symbol, and a new position, and returns the sheet, with that symbol in its new position
-    let repositionSymbol (sheetModel: SheetT.Model) (compID: ComponentId) (newCentrePos: XYPos) =
-        let symbol = Optic.get (SheetT.symbolOf_ compID) sheetModel
+    let repositionSymbol (sheetModel: SheetT.Model) (symbol: Symbol) (newCentrePos: XYPos) =
+        let sheetSymbolLens = SheetT.symbolOf_ symbol.Id
+        let symbol = Optic.get sheetSymbolLens sheetModel
         let offset = newCentrePos - symbol.CentrePos
 
-        Optic.set (SheetT.symbolOf_ compID) {symbol with CentrePos = symbol.CentrePos + offset; Pos = symbol.Pos + offset}
+        Optic.set sheetSymbolLens {symbol with CentrePos = symbol.CentrePos + offset; Pos = symbol.Pos + offset}
+
+
+    /// taking inspiration from SheetT.symbolOf_, this function returns a lens:\
+    /// getting and setting of a portMaps' portList for a given Edge
+    let portListOf_ edge = 
+        Lens.create <|| (
+            (fun pMaps -> 
+                (Optic.get order_ pMaps)[edge]), 
+            (fun newList pMaps -> 
+                (Optic.get order_ pMaps)
+                |> Map.add edge newList
+                |> fun newPortMap -> 
+                    Optic.set order_ newPortMap pMaps
+            )
+        )
+
+    /// gets the list of strings defining port order\
+    /// for a symbol, for its given edge
+    let getPortOrder (symbol: Symbol) (edge: Edge) =
+        Optic.get (portMaps_ >-> portListOf_ edge) symbol
 
     
-    let B3RW = ()  // can surely do something with Symbol record
+    /// sets the list of strings defining port order, at the given edge,\
+    /// to the provided new port ordering :)
+    let setPortOrder (symbol: Symbol) (edge: Edge) newPortOrder = 
+        Optic.set (portMaps_ >-> portListOf_ edge) newPortOrder symbol 
 
 
     /// A lens that allows getting and setting of `ReversedInputPorts` option\
     /// for a `Mux2` symbol
-    let mux2ReversedState_ = Lens.create (fun symbol -> symbol.ReversedInputPorts) (fun stateOption symbol -> {symbol with ReversedInputPorts = stateOption})
+    let mux2ReversedState_ = 
+        Lens.create <|| (
+            (fun symbol -> symbol.ReversedInputPorts),
+            (fun stateOption symbol -> 
+                {symbol with ReversedInputPorts = stateOption})
+        )
 
 
-    let B5R = ()
-    let B6R = ()
+    let getPortPosition (port: Port) = ()  // can make use of `port.HostId`
+    let B6R = ()  // can make use of above-mentioned BB stuff :)
     let B7RW = ()
     let B8RW = ()
 
@@ -78,6 +108,16 @@ let T5R = ()
 let T6R = ()
 
 let Ext = ()  // See `TestDrawBlock.HLPTick3.visibleSegments`
+
+
+(****************************Other Random Functions****************************
+
+/// check that the port order list is valid
+let checkValidIndices portOrderList =
+    let portOrderSet = Set.ofList portOrderList
+    portOrderSet = Set.ofList [0..portOrderList.Length-1]
+
+******************************************************************************)
 
 
 
