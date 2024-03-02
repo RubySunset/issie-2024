@@ -57,9 +57,13 @@ module Lenses =
 
     
     let B3RW = ()  // can surely do something with Symbol record
-    let B4RW (symbol: Symbol) = 
-        // Symbol.ReversedInputPorts: bool option
-        
+
+
+    /// A lens that allows getting and setting of `ReversedInputPorts` option\
+    /// for a `Mux2` symbol
+    let mux2ReversedState_ = Lens.create (fun symbol -> symbol.ReversedInputPorts) (fun stateOption symbol -> {symbol with ReversedInputPorts = stateOption})
+
+
     let B5R = ()
     let B6R = ()
     let B7RW = ()
