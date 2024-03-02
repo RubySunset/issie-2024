@@ -47,12 +47,19 @@ module Lenses =
             (newSize.X / comp.W, newSize.Y / comp.H))
         |> Result.map (fun (newHScale, newVScale) -> {symbol with HScale = Some newHScale; VScale = Some newVScale})
 
+
     /// takes in a sheet model, a symbol, and a new position, and returns the sheet, with that symbol in its new position
-    let repositionSymbol (model: SheetT.Model) (symbol: Symbol) newPos =
-        failwithf "yay"    
+    let repositionSymbol (sheetModel: SheetT.Model) (compID: ComponentId) (newCentrePos: XYPos) =
+        let symbol = Optic.get (SheetT.symbolOf_ compID) sheetModel
+        let offset = newCentrePos - symbol.CentrePos
+
+        Optic.set (SheetT.symbolOf_ compID) {symbol with CentrePos = symbol.CentrePos + offset; Pos = symbol.Pos + offset}
+
     
-    let B3RW = ()
-    let B4RW = ()
+    let B3RW = ()  // can surely do something with Symbol record
+    let B4RW (symbol: Symbol) = 
+        // Symbol.ReversedInputPorts: bool option
+        
     let B5R = ()
     let B6R = ()
     let B7RW = ()
