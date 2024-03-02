@@ -142,8 +142,18 @@ module Lenses =
 
     /// takes in a symbol and returns a BoundingBox\
     /// representing the dimensions of that symbol
-    let getSymbolBB (symbol: Symbol) = ()  
-        // can make use of above-mentioned BB stuff :)
+    let getSymbolBB (symbol: Symbol) =
+        let comp = symbol.Component
+
+        match getScaleValues symbol with
+        | Ok (hscale, vscale) -> // CustomComponent
+            let size = {X = comp.W * hscale; Y = comp.H * vscale}
+            { TopLeft = symbol.Pos; W = size.X; H = size.Y }
+        | Error _ ->  // not a CustomComponent
+            {TopLeft = symbol.Pos; W = comp.W; H = comp.H}
+
+
+    /// idk
     let B7RW = ()
     let B8RW = ()
 
