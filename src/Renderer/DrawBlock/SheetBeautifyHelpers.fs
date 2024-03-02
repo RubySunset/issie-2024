@@ -86,12 +86,11 @@ module Lenses =
 
     /// A lens that allows getting and setting of `ReversedInputPorts` option\
     /// for a `Mux2` symbol
-    let mux2ReversedState_ = 
-        Lens.create <|| (
-            (fun symbol -> symbol.ReversedInputPorts),
-            (fun stateOption symbol -> 
-                {symbol with ReversedInputPorts = stateOption})
-        )
+    let mux2ReversedState_ = Lens.create <|| (
+        (fun symbol -> symbol.ReversedInputPorts),
+        (fun stateOption symbol -> 
+            {symbol with ReversedInputPorts = stateOption})
+    )
 
     
     /// Performs a 'clockwise shift' on an edge value
@@ -153,9 +152,20 @@ module Lenses =
             {TopLeft = symbol.Pos; W = comp.W; H = comp.H}
 
 
-    /// idk
-    let B7RW = ()
-    let B8RW = ()
+    /// Lens for getting and setting the rotation state of a symbol
+    let symbolRotationState_ = Lens.create <|| (
+        (fun symbol -> symbol.STransform.Rotation),
+        (fun newRotation symbol -> 
+            {symbol with Symbol.STransform.Rotation = newRotation})
+    )
+
+
+    /// Lens for getting and setting the flip state of a symbol
+    let symbolFlipState_ = Lens.create <|| (
+        (fun symbol -> symbol.STransform.Flipped),
+        (fun newFlip symbol -> 
+            {symbol with Symbol.STransform.Flipped = newFlip})
+    )
 
 
 let T1R = ()
