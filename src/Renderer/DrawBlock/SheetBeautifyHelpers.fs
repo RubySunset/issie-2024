@@ -93,9 +93,57 @@ module Lenses =
                 {symbol with ReversedInputPorts = stateOption})
         )
 
+    
+    /// Performs a 'clockwise shift' on an edge value
+    let shiftEdge (edge: Edge)= 
+        match edge with
+        | Top -> Right
+        | Right -> Bottom
+        | Bottom -> Left
+        | Left -> Top
 
-    let getPortPosition (port: Port) = ()  // can make use of `port.HostId`
-    let B6R = ()  // can make use of above-mentioned BB stuff :)
+    /// grabs the port's parent symbol and performs some arithmetic\
+    /// to determine the port's position on the sheet\
+    /// There's almost definitely a quicker/neater way of doing this :/
+    let getPortPosition (sheet: SheetT.Model) (port: Port) = 
+        let symbol = 
+            Optic.get (
+                SheetT.symbolOf_ (ComponentId port.HostId)
+            ) sheet
+
+        let portEdge: Edge = 
+            match port.PortType with
+            | PortType.Input -> Left
+            | PortType.Output -> Right
+            |> fun edge -> 
+                match symbol.STransform.Rotation with
+                | Degree0 -> edge
+                | Degree90 -> shiftEdge edge
+                | Degree180 -> (shiftEdge >> shiftEdge) edge
+                | Degree270 -> (shiftEdge >> shiftEdge >> shiftEdge) edge
+            |> fun edge -> 
+                match symbol.STransform.Flipped with
+                | true -> (shiftEdge >> shiftEdge) edge
+                | false -> edge
+
+        let edgeCentreOffset edge =
+            match edge with
+            | Top -> 
+                symbol.CentrePos + { X = 0.0; Y = symbol.Component.H / 2.0 }
+            | Right -> 
+                symbol.CentrePos + { X = symbol.Component.W / 2.0; Y = 0.0 }
+            | Bottom -> 
+                symbol.CentrePos - { X = 0.0; Y = symbol.Component.H / 2.0 }
+            | Left -> 
+                symbol.CentrePos - { X = symbol.Component.W / 2.0; Y = 0.0 }
+
+        symbol.CentrePos + edgeCentreOffset portEdge
+
+
+    /// takes in a symbol and returns a BoundingBox\
+    /// representing the dimensions of that symbol
+    let getSymbolBB (symbol: Symbol) = ()  
+        // can make use of above-mentioned BB stuff :)
     let B7RW = ()
     let B8RW = ()
 
