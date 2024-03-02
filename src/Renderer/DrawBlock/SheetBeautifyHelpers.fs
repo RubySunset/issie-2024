@@ -4,19 +4,15 @@
 // Typical candidates: all individual code library functions.
 // Other helpers identified by Team
 
-module Lenses =
+
+/// Module for the Lens-like functions, might need a better name...
+module LensLike =
     open Optics
     open Optics.Operators
     open CommonTypes
     open DrawModelType
     open DrawModelType.SymbolT
     
-    
-    (* Useful Lenses and Records and things
-    SheetT.boundingBoxes_ - Lens<SheetT, BoundingBox list>
-    CommonTypes.BoundingBox - Bounding Box type
-    CommonTypes.size_ - Lens<BoundingBox, Size>
-    *)
 
     /// As only Custom Components can be resized,\
     /// checks symbol component to test whether or not it has scale values
@@ -168,14 +164,50 @@ module Lenses =
     )
 
 
-let T1R = ()
-let T2R = ()
-let T3R = ()
-let T4R = ()
-let T5R = ()
-let T6R = ()
+(* Useful Lenses and Records and things
+SheetT.boundingBoxes_ - Lens<SheetT, BoundingBox list>
+CommonTypes.BoundingBox - Bounding Box type
+CommonTypes.size_ - Lens<BoundingBox, Size>
+*)
 
-let Ext = ()  // See `TestDrawBlock.HLPTick3.visibleSegments`
+
+/// A module of utility functions that count things
+module Counters =
+    /// Counts the number of symbol pairs in the sheet that intersect each other
+    let symbolIntersectionCount = 
+        () // The number of pairs of symbols that intersect each other. See Tick3 for a related function. Count over all pairs of symbols.
+
+
+    /// idk
+    let T2R = 
+        ()  // The number of distinct wire visible segments that intersect with one or more symbols. See Tick3.HLPTick3.visibleSegments for a helper. Count over all visible wire segments.
+
+    
+    /// idk
+    let T3R = 
+        () // The number of distinct pairs of segments that cross each other at right angles. Does not include 0 length segments or segments on same net intersecting at one end, or segments on same net on top of each other. Count over whole sheet.
+
+
+    /// idk
+    let T4R = 
+        () // Sum of wiring segment length, counting only one when there are N same-net segments overlapping (this is the visible wire length on the sheet). Count over whole sheet.
+
+
+    /// idk
+    let T5R = 
+        () // Number of visible wire right-angles. Count over whole sheet.
+
+
+    /// idk
+    let T6R = 
+        () // The zero-length segments in a wire with non-zero segments on either side that have Lengths of opposite signs lead to a wire retracing itself. Note that this can also apply at the end of a wire (where the zero-length segment is one from the end). This is a wiring artifact that should never happen but errors in routing or separation can cause it. Count over the whole sheet. Return from one function a list of all the segments that retrace, and also a list of all the end of wire segments that retrace so far that the next segment (index = 3 or Segments.Length – 4) - starts inside a symbol.
+
+
+    /// idk
+    let Ext = 
+        ()  // See `TestDrawBlock.HLPTick3.visibleSegments` The visible segments of a wire, as a list of vectors, from source end to target end. Note that a zero length segment one from either end of a wire is allowed which if present causes the end three segments to coalesce into a single visible segment.
+
+
 
 
 (****************************Other Random Functions****************************
