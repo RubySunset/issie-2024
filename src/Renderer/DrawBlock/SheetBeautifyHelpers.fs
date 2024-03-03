@@ -227,7 +227,6 @@ module Helpers =
     /// to coalesce into a single visible segment.\
     /// A wire can have any number of visible segments - even 1.
     let effectiveSegments (model: SheetT.Model) (absolute: bool) (wId: ConnectionId): XYPos list =
-
         let wire = model.Wire.Wires[wId] // get wire from model
 
         /// helper to match even and odd integers in patterns (active pattern)
@@ -310,12 +309,17 @@ module Counters =
                     BlockHelpers.overlap2D bb segmentVector
             )
 
+    /// gets all wires from the sheet, and applies the selector to each wire\
+    /// expecting selector to be `fst` or `snd`,\
+    /// but other valid selectors could also be useful
+    let getWires (model: SheetT.Model) selector = 
+        Optic.get SheetT.wires_ model
+        |> Map.toList
+        |> List.map selector
+
     /// counts the number of effective wire segments that intersect >= 1 symbols
     let effectiveSegmentSymbolIntersections (model: SheetT.Model) = 
-        let wireIds = 
-            Optic.get SheetT.wires_ model
-            |> Map.toList
-            |> List.map fst
+        let wireIds = getWires model fst
 
         let symbols = 
             model
@@ -331,17 +335,30 @@ module Counters =
         |> List.length
 
 
-    let fred = 5
+    /// returns a function: sth that takes a wire or sth and checks sth
+    let wireIntersectingWireOrSth (symbols: SymbolT.Symbol seq): (XYPos*XYPos) -> bool =
+        let symbolBBs = Seq.map LensLike.getSymbolBB symbols
+        
+        let bbToXYPos (symbolBB: BoundingBox): (XYPos*XYPos) = 
+            symbolBB.TopLeft,  // already an XYPos
+            { X = symbolBB.TopLeft.X + symbolBB.W; 
+              Y = symbolBB.TopLeft.Y - symbolBB.H; }
+        
+        let symbolXYPosTuples = 
+            Seq.map bbToXYPos symbolBBs
+        
+        fun segmentVector -> 
+            symbolXYPosTuples
+            |> Seq.exists (
+                fun bb -> 
+                    BlockHelpers.overlap2D bb segmentVector
+            )
 
-    /// idk
+    /// TODO: figure out how to keep Orientations while using `coalesce`
     let T3R (model: SheetT.Model) = 
-        let symbols = 
-            Optic.get SheetT.symbol_ model
-            |> Optic.get SymbolT.symbols_
+        let wires = getWires model snd
 
-        model.Wire.Wires
-        |> Map.toList
-        |> List.map snd
+        wires
         |> List.map 
         |> List.allPairs
         |> List.filter (fun (a, b) -> (* see if their Orientations clash *))
@@ -359,9 +376,16 @@ module Counters =
         // this means that any segment that is on top of another segment is only counted once, check Nets and whatnot
 
 
-    /// idk
-    let T5R = 
-        () // Number of visible wire right-angles. Count over whole sheet.
+    /// counts the number of right angles for all wires in the sheet
+    let wireRightAngleCount (model: SheetT.Model) = 
+        let wireIds = getWires model fst
+
+        wireIds
+        |> List.map (Helpers.effectiveSegments model false)
+        |> List.map (fun wire -> List.length wire - 1)
+        |> List.sum
+        // List.length - 1 gives the number of orientation changes
+        // in an 'effective Segment' list, for a wire :)
 
 
     /// idk
