@@ -258,23 +258,54 @@ let optimiseSymbol
     let model' = Optic.set (symbolOf_ symbol.Id) scaledSymbol wModel
     BusWireSeparate.routeAndSeparateSymbolWires model' symbol.Id
 
-/// <summary>HLP 23: AUTHOR Ismagilov - Get the bounding box of multiple selected symbols</summary>
+// TODO: CLEAN UP FROM HERE
+
+
+(* HLP24-Cleanup (pw321):
+    The previous implementation had a whole jumble of functions for each min or max of the bounding box, for each of the X or Y directions.
+    I chose to just rewrite it because there were too many new variable definitions and too many anonymous functions for no reason, lots of unnecessary bracketing, and wayyy too much code repetition.
+
+    The new implementation uses a single pipeline to:
+    - get the bounding boxes of all symbols
+    - split into TopLeft and BottomRight
+    - split into X and Y coords for each
+    - concatenating all the X and Y coords into their respective list
+        - admittedly a little messy, but readable
+    - get the mins and maxes of all the values symbols in the block
+      for both the X or Y directions
+    - before then formatting them in a Bounding Box, as before :)
+*)
+
+
+/// <summary>HLP 23: AUTHOR Ismagilov - Get the bounding box of multiple selected symbols\
+/// HLP24: modified by Pierce Wiegerling</summary>
 /// <param name="symbols"> Selected symbols list</param>
 /// <returns>Bounding Box</returns>
-let getBlock 
-        (symbols:Symbol List) :BoundingBox = 
+let getBlock (symbols:Symbol List) :BoundingBox = 
+    let forEach (f: 'a -> 'b) (a: 'a, b: 'a) = (f a, f b)
+    
+    symbols
+    |> List.map getSymbolBoundingBox
+    |> List.map (fun bb -> (bb.TopLeft, bb.BottomRight()))
+    |> List.map (fun (tlVal, brVal) -> 
+        [tlVal.X; brVal.X], [tlVal.Y; brVal.Y]  // split into X, Y components
+    )
+    |> List.unzip  // separate into X and Y lists
+    |> forEach (List.collect id)  // collecting all the BB sublists
+    |> fun (xList, yList) -> 
+        let minX = List.min xList
+        let minY = List.min yList
+        let maxX = List.max xList
+        let maxY = List.max yList
 
-    let maxXsym = (List.maxBy (fun (x:Symbol) -> x.Pos.X+(snd (getRotatedHAndW x))) symbols)
-    let maxX = maxXsym.Pos.X + (snd (getRotatedHAndW maxXsym))
+        {TopLeft = {X = minX; Y = minY}; W = maxX-minX; H = maxY-minY}
 
-    let minX = (List.minBy (fun (x:Symbol) -> x.Pos.X) symbols).Pos.X
 
-    let maxYsym = List.maxBy (fun (x:Symbol) -> x.Pos.Y+(fst (getRotatedHAndW x))) symbols
-    let maxY = maxYsym.Pos.Y + (fst (getRotatedHAndW maxYsym))
+(* HLP24-Cleanup (pw321):
+    What was wrong with the previous implementation?
 
-    let minY = (List.minBy (fun (x:Symbol) -> x.Pos.Y) symbols).Pos.Y
-
-    {TopLeft = {X = minX; Y = minY}; W = maxX-minX; H = maxY-minY}
+    What does this cleanp do?
+*)
 
 
 /// <summary>HLP 23: AUTHOR Ismagilov - Takes a point Pos, a centre Pos, and a rotation type and returns the point flipped about the centre</summary>
@@ -305,6 +336,15 @@ let rotatePointAboutBlockCentre
     |> rotateAboutCentre
     |> relativeToTopLeft
 
+
+
+(* HLP24-Cleanup (pw321):
+    What was wrong with the previous implementation?
+
+    What does this cleanp do?
+*)
+
+
 /// <summary>HLP 23: AUTHOR Ismagilov - Takes a point Pos, a centre Pos, and a flip type and returns the point flipped about the centre</summary>
 /// <param name="point"> Original XYPos</param>
 /// <param name="center"> The center XYPos that the point is flipped about</param>
@@ -320,6 +360,14 @@ let flipPointAboutBlockCentre
     | FlipVertical -> 
         {X = point.X; Y = center.Y - (point.Y - center.Y)}
 
+
+(* HLP24-Cleanup (pw321):
+    just some unnecessary float casting (h and w are already floats)
+
+    Just tidied up a bit, no big changes
+*)
+
+
 /// <summary>HLP 23: AUTHOR Ismagilov - Get the new top left of a symbol after it has been rotated</summary>
 /// <param name="rotation"> Rotated CW or AntiCW</param>
 /// <param name="h"> Original height of symbol (Before rotation)</param>
@@ -328,17 +376,24 @@ let flipPointAboutBlockCentre
 /// <returns>New top left point of the symbol</returns>
 let adjustPosForBlockRotation
         (rotation:Rotation) 
-        (h: float)
-        (w:float)
+        (h: float) (w:float)
         (pos: XYPos)
          : XYPos =
     let posOffset =
         match rotation with
-        | Degree0 -> {X = 0; Y = 0}
-        | Degree90 -> {X=(float)h ;Y=0}
-        | Degree180 -> {X= (float)w; Y= -(float)h}
-        | Degree270 -> { X = 0 ;Y = (float)w }
+        | Degree0 -> { X = 0.0; Y = 0.0 }
+        | Degree90 -> { X = h ; Y = 0.0 }
+        | Degree180 -> { X = w; Y= -h }
+        | Degree270 -> { X = 0.0 ; Y = w }
     pos - posOffset
+
+
+(* HLP24-Cleanup (pw321):
+    just some unnecessary float casting (h and w are already floats)
+
+    Just tidied up a bit, no big changes
+*)
+
 
 /// <summary>HLP 23: AUTHOR Ismagilov - Get the new top left of a symbol after it has been flipped</summary>
 /// <param name="flip">  Flipped horizontally or vertically</param>
@@ -348,13 +403,12 @@ let adjustPosForBlockRotation
 /// <returns>New top left point of the symbol</returns>
 let adjustPosForBlockFlip
         (flip:FlipType) 
-        (h: float)
-        (w:float)
+        (h: float) (w:float)
         (pos: XYPos) =
     let posOffset =
         match flip with
-        | FlipHorizontal -> {X=(float)w ;Y=0}
-        | FlipVertical -> { X = 0 ;Y = (float)h }
+        | FlipHorizontal -> { X = w ; Y = 0.0 }
+        | FlipVertical -> { X = 0.0 ;Y = h }
     pos - posOffset
 
 /// <summary>HLP 23: AUTHOR Ismagilov - Rotate a symbol in its block.</summary>
