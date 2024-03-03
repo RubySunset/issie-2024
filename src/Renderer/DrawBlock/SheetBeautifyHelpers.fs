@@ -173,9 +173,26 @@ CommonTypes.size_ - Lens<BoundingBox, Size>
 
 /// A module of utility functions that count things
 module Counters =
+    open DrawModelType
+    open CommonTypes
+
+    
     /// Counts the number of symbol pairs in the sheet that intersect each other
-    let symbolIntersectionCount = 
-        () // The number of pairs of symbols that intersect each other. See Tick3 for a related function. Count over all pairs of symbols.
+    let symbolIntersectionCount (sheet: SymbolT.Model)  =
+        let symbols = 
+            sheet.Symbols
+            |> Map.toSeq
+            |> Seq.map snd
+            |> Seq.toList
+
+        List.allPairs symbols symbols
+        |> List.filter (
+            fun (symbol1, symbol2) -> 
+                let bb1 = LensLike.getSymbolBB symbol1
+                let bb2 = LensLike.getSymbolBB symbol2
+                (symbol1 <> symbol2) && BlockHelpers.overlap2DBox bb1 bb2
+        )
+        |> List.length
 
 
     /// idk
