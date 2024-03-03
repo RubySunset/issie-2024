@@ -258,8 +258,6 @@ let optimiseSymbol
     let model' = Optic.set (symbolOf_ symbol.Id) scaledSymbol wModel
     BusWireSeparate.routeAndSeparateSymbolWires model' symbol.Id
 
-// TODO: CLEAN UP FROM HERE
-
 
 (* HLP24-Cleanup (pw321):
     The previous implementation had a whole jumble of functions for each min or max of the bounding box, for each of the X or Y directions.
@@ -302,9 +300,7 @@ let getBlock (symbols:Symbol List) :BoundingBox =
 
 
 (* HLP24-Cleanup (pw321):
-    What was wrong with the previous implementation?
-
-    What does this cleanp do?
+    No major changes, just tidied up some type annotations, quite liked the symmetry of the functions
 *)
 
 
@@ -314,20 +310,20 @@ let getBlock (symbols:Symbol List) :BoundingBox =
 /// <param name="rotation"> Clockwise or Anticlockwise </param>
 /// <returns>New flipped point</returns>
 let rotatePointAboutBlockCentre 
-            (point:XYPos) 
-            (centre:XYPos) 
-            (rotation:Rotation) = 
+    (point: XYPos) 
+    (centre: XYPos) 
+    (rotation: Rotation) = 
     let relativeToCentre = (fun x-> x - centre)
-    let rotateAboutCentre (pointIn:XYPos) = 
+    let rotateAboutCentre pointIn = 
         match rotation with 
         | Degree0 -> 
             pointIn
         | Degree90 ->
-            {X = pointIn.Y ; Y = -pointIn.X}
+            { X = pointIn.Y ; Y = -pointIn.X }
         | Degree180 -> 
-            {X = -pointIn.X ; Y = - pointIn.Y}
+            { X = -pointIn.X ; Y = -pointIn.Y }
         | Degree270 ->
-            {X = -pointIn.Y ; Y = pointIn.X}
+            { X = -pointIn.Y ; Y = pointIn.X }
            
     let relativeToTopLeft = (fun x-> centre - x)
 
@@ -339,9 +335,7 @@ let rotatePointAboutBlockCentre
 
 
 (* HLP24-Cleanup (pw321):
-    What was wrong with the previous implementation?
-
-    What does this cleanp do?
+    Nothing to see here, nothing needed to be done :)
 *)
 
 
@@ -351,14 +345,14 @@ let rotatePointAboutBlockCentre
 /// <param name="flip"> Horizontal or Vertical flip</param>
 /// <returns>New flipped point</returns>
 let flipPointAboutBlockCentre 
-    (point:XYPos)
-    (center:XYPos)
-    (flip:FlipType) = 
+    (point: XYPos)
+    (center: XYPos)
+    (flip: FlipType) = 
     match flip with
     | FlipHorizontal-> 
-        {X = center.X - (point.X - center.X); Y = point.Y} 
+        { X = center.X - (point.X - center.X); Y = point.Y } 
     | FlipVertical -> 
-        {X = point.X; Y = center.Y - (point.Y - center.Y)}
+        { X = point.X; Y = center.Y - (point.Y - center.Y) }
 
 
 (* HLP24-Cleanup (pw321):
@@ -375,8 +369,8 @@ let flipPointAboutBlockCentre
 /// <param name="sym"> Symbol</param>
 /// <returns>New top left point of the symbol</returns>
 let adjustPosForBlockRotation
-        (rotation:Rotation) 
-        (h: float) (w:float)
+        (rotation: Rotation) 
+        (h: float) (w: float)
         (pos: XYPos)
          : XYPos =
     let posOffset =
@@ -402,8 +396,8 @@ let adjustPosForBlockRotation
 /// <param name="sym"> Symbol</param>
 /// <returns>New top left point of the symbol</returns>
 let adjustPosForBlockFlip
-        (flip:FlipType) 
-        (h: float) (w:float)
+        (flip: FlipType) 
+        (h: float) (w: float)
         (pos: XYPos) =
     let posOffset =
         match flip with
