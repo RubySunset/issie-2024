@@ -33,6 +33,11 @@ module LensLike =
         getScaleValues symbol
         |> Result.map (fun (hscale, vscale) ->
             {X = comp.W * hscale; Y = comp.H * vscale})
+    
+    /// didn't have to implement it,\
+    /// but this is just a redundant function wrapper, so...
+    let getCCSize2 (symbol: Symbol) =
+        Symbol.getRotatedHAndW symbol
         
     /// returns the resized Custom Component symbol\
     /// using the provided (width, height), as a Result
@@ -124,13 +129,13 @@ module LensLike =
         let edgeCentreOffset edge =
             match edge with
             | Top -> 
-                symbol.CentrePos + { X = 0.0; Y = symbol.Component.H / 2.0 }
+                symbol.CentrePos + { X = 0.0; Y = - symbol.Component.H / 2.0 }
             | Right -> 
                 symbol.CentrePos + { X = symbol.Component.W / 2.0; Y = 0.0 }
             | Bottom -> 
                 symbol.CentrePos - { X = 0.0; Y = symbol.Component.H / 2.0 }
             | Left -> 
-                symbol.CentrePos - { X = symbol.Component.W / 2.0; Y = 0.0 }
+                symbol.CentrePos - { X = - symbol.Component.W / 2.0; Y = 0.0 }
 
         symbol.CentrePos + edgeCentreOffset portEdge
 
@@ -295,9 +300,7 @@ module Counters =
         let symbolBBs = Seq.map LensLike.getSymbolBB symbols
         
         let bbToXYPos (symbolBB: BoundingBox): (XYPos*XYPos) = 
-            symbolBB.TopLeft,  // already an XYPos
-            { X = symbolBB.TopLeft.X + symbolBB.W; 
-              Y = symbolBB.TopLeft.Y - symbolBB.H; }
+            symbolBB.TopLeft, symbolBB.BottomRight()
         
         let symbolXYPosTuples = 
             Seq.map bbToXYPos symbolBBs
@@ -334,9 +337,9 @@ module Counters =
         |> List.filter (wireIntersectingSymbol symbols)
         |> List.length
 
-
+(*
     /// returns a function: sth that takes a wire or sth and checks sth
-    let wireIntersectingWireOrSth (symbols: SymbolT.Symbol seq): (XYPos*XYPos) -> bool =
+    let wireIntersectingWire (wire1: BusWireT.Wire): BusWireT.Wire -> bool =
         let symbolBBs = Seq.map LensLike.getSymbolBB symbols
         
         let bbToXYPos (symbolBB: BoundingBox): (XYPos*XYPos) = 
@@ -353,22 +356,25 @@ module Counters =
                 fun bb -> 
                     BlockHelpers.overlap2D bb segmentVector
             )
-
+*)
+(*
     /// TODO: figure out how to keep Orientations while using `coalesce`
+    /// that'll solve the whole thing, cos you check:
+    /// intersecting && orientation clash for each pair, and you're done
     let T3R (model: SheetT.Model) = 
         let wires = getWires model snd
 
         wires
-        |> List.map 
+        |> List.map (id (*COME UP WITH STH TO SAVE ORIENTATION*))
         |> List.allPairs
-        |> List.filter (fun (a, b) -> (* see if their Orientations clash *))
         |> List.filter (
+            // see if their Orientations clash
             fun (seg1, seg2) -> 
                 BlockHelpers.overlap1D (seg1.X, seg2.X) (seg1.Y, seg2.Y)
         )
         |> List.length
         // The number of distinct pairs of segments that cross each other at right angles. Does not include 0 length segments or segments on same net intersecting at one end, or segments on same net on top of each other. Count over whole sheet.
-
+*)
 
     /// idk
     let T4R = 
@@ -398,8 +404,6 @@ module Counters =
         ()  // See `TestDrawBlock.HLPTick3.visibleSegments` The visible segments of a wire, as a list of vectors, from source end to target end. Note that a zero length segment one from either end of a wire is allowed which if present causes the end three segments to coalesce into a single visible segment.
 
 
-
-
 (****************************Other Random Functions****************************
 
 /// check that the port order list is valid
@@ -408,11 +412,3 @@ let checkValidIndices portOrderList =
     portOrderSet = Set.ofList [0..portOrderList.Length-1]
 
 ******************************************************************************)
-
-
-
-/// TODO: Move to TestDrawBlock
-module TestDrawblockD2 =
-    () // TODO: your section of the Project
-    // rotate, flip, alter port order :)
-    // but no need to alter position or scales :)
