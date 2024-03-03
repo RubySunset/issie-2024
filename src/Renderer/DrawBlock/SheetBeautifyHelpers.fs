@@ -170,17 +170,112 @@ CommonTypes.BoundingBox - Bounding Box type
 CommonTypes.size_ - Lens<BoundingBox, Size>
 *)
 
+/// copied in from TestDrawBlock, because F# doesn't like forward declarations
+module Helpers =
+    open EEExtensions
+    open Optics
+    open CommonTypes
+    open DrawModelType
+
+    /// Optic to access SheetT.Model from Issie Model
+    let sheetModel_ = ModelType.sheet_
+
+    /// Optic to access BusWireT.Model from SheetT.Model
+    let busWireModel_ = SheetT.wire_
+
+    /// Optic to access SymbolT.Model from SheetT.Model
+    let symbolModel_ = SheetT.symbol_
+
+    /// allowed max X or y coord of svg canvas
+    let maxSheetCoord = Sheet.Constants.defaultCanvasSize
+    let middleOfSheet = {X=maxSheetCoord/2.;Y=maxSheetCoord/2.}
+    
+    //--------------------------------------------------------------------------
+    // visibleSegments is included here as a helper for info
+    // and because it is needed in project work
+    //--------------------------------------------------------------------------
+
+    // have taken `coalesce` out because it's very useful
+    /// Return a list of segment vectors with 3 vectors
+    /// coalesced into one visible equivalent
+    /// if this is possible,\
+    /// otherwise return segVecs unchanged.\
+    /// Index must be in range 1..segVecs
+    let rec coalesce (segVecs: XYPos list)  =
+        match (List.tryFindIndex 
+        (fun segVec -> segVec =~ XYPos.zero) 
+        segVecs[1..segVecs.Length-2]) with  // omit nubs
+        | Some zeroVecIndex -> 
+            // base index onto full segVecs
+            let index = zeroVecIndex + 1 
+            segVecs[0..index-2] @
+            [segVecs[index-1] + segVecs[index+1]] @
+            segVecs[index+2..segVecs.Length - 1]
+            |> coalesce 
+            // ^ recurse as long as more coalescing might be possible
+        | None -> segVecs 
+        // ^ end when there are no inner zero-length segment vectors
+
+    // I feel 'effective segment' may be more descriptive
+    // than 'visible segment', since the latter could be taken to imply that
+    // the segment is visible on the screen, which is not what it means.
+    /// The visible segments of a wire, as a list of vectors, 
+    /// from source end to target end.\
+    /// Note that in a wire with n segments, 
+    /// a zero length (invisible) segment at any index [1..n-2] is allowed,\
+    /// which, if present, causes the two segments on either side of it 
+    /// to coalesce into a single visible segment.\
+    /// A wire can have any number of visible segments - even 1.
+    let effectiveSegments (model: SheetT.Model) (absolute: bool) (wId: ConnectionId): XYPos list =
+
+        let wire = model.Wire.Wires[wId] // get wire from model
+
+        /// helper to match even and odd integers in patterns (active pattern)
+        let (|IsEven|IsOdd|) (n: int) = match n % 2 with | 0 -> IsEven | _ -> IsOdd
+
+        /// Convert seg into its XY Vector (from start to end of segment).\
+        /// index must be the index of seg in its containing wire.
+        let getSegmentVector (index:int) (seg: BusWireT.Segment) =
+            // The implicit horizontal or vertical direction of a segment
+            // is determined by its index in the list of wire segments
+            // and the wire's initial direction
+            match index, wire.InitialOrientation with
+            | IsEven, BusWireT.Vertical | IsOdd, BusWireT.Horizontal -> 
+                {X=0.; Y=seg.Length}
+            | IsEven, BusWireT.Horizontal | IsOdd, BusWireT.Vertical -> 
+                {X=seg.Length; Y=0.}
+
+        /// takes in a list of relative Segment Vectors\
+        /// returns a list of the absolute start point of each Segment Vector\
+        /// oh, and the end point, of course
+        let getAbsoluteSegVec (segVec: XYPos list) = 
+            wire.StartPos::segVec 
+            |> List.scan (+) XYPos.zero
+            // Yes, this does output an extra element at the head of the list,
+            // in contrast to relative vectors, but I can't see another way, rn
+
+        wire.Segments
+        |> List.mapi getSegmentVector
+        |> coalesce
+        |> if absolute  // modification to allow returning of absolute positions
+           then getAbsoluteSegVec
+           else id
+
 
 /// A module of utility functions that count things
 module Counters =
     open DrawModelType
     open CommonTypes
+    open Optics
+    open Optics.Operators
 
-    
+
     /// Counts the number of symbol pairs in the sheet that intersect each other
-    let symbolIntersectionCount (sheet: SymbolT.Model)  =
+    let symbolIntersectionCount (sheet: SheetT.Model) =
         let symbols = 
-            sheet.Symbols
+            sheet
+            |> Optic.get SheetT.symbol_
+            |> Optic.get SymbolT.symbols_
             |> Map.toSeq
             |> Seq.map snd
             |> Seq.toList
@@ -195,19 +290,73 @@ module Counters =
         |> List.length
 
 
-    /// idk
-    let T2R = 
-        ()  // The number of distinct wire visible segments that intersect with one or more symbols. See Tick3.HLPTick3.visibleSegments for a helper. Count over all visible wire segments.
+    /// returns a function: that takes an absolute segment vector\
+    /// and returns true if it intersects any symbols in the provided sequence
+    let wireIntersectingSymbol (symbols: SymbolT.Symbol seq): (XYPos*XYPos) -> bool =
+        let symbolBBs = Seq.map LensLike.getSymbolBB symbols
+        
+        let bbToXYPos (symbolBB: BoundingBox): (XYPos*XYPos) = 
+            symbolBB.TopLeft,  // already an XYPos
+            { X = symbolBB.TopLeft.X + symbolBB.W; 
+              Y = symbolBB.TopLeft.Y - symbolBB.H; }
+        
+        let symbolXYPosTuples = 
+            Seq.map bbToXYPos symbolBBs
+        
+        fun segmentVector -> 
+            symbolXYPosTuples
+            |> Seq.exists (
+                fun bb -> 
+                    BlockHelpers.overlap2D bb segmentVector
+            )
 
-    
+    /// counts the number of effective wire segments that intersect >= 1 symbols
+    let effectiveSegmentSymbolIntersections (model: SheetT.Model) = 
+        let wireIds = 
+            Optic.get SheetT.wires_ model
+            |> Map.toList
+            |> List.map fst
+
+        let symbols = 
+            model
+            |> Optic.get (SheetT.symbol_ >-> SymbolT.symbols_)
+            |> Map.toSeq
+            |> Seq.map snd
+        
+        // creates tuples of the starts and ends of each effective wire segment
+        // then filters out the ones that don't intersect with any symbols
+        wireIds
+        |> List.collect (Helpers.effectiveSegments model true >> List.pairwise)
+        |> List.filter (wireIntersectingSymbol symbols)
+        |> List.length
+
+
+    let fred = 5
+
     /// idk
-    let T3R = 
-        () // The number of distinct pairs of segments that cross each other at right angles. Does not include 0 length segments or segments on same net intersecting at one end, or segments on same net on top of each other. Count over whole sheet.
+    let T3R (model: SheetT.Model) = 
+        let symbols = 
+            Optic.get SheetT.symbol_ model
+            |> Optic.get SymbolT.symbols_
+
+        model.Wire.Wires
+        |> Map.toList
+        |> List.map snd
+        |> List.map 
+        |> List.allPairs
+        |> List.filter (fun (a, b) -> (* see if their Orientations clash *))
+        |> List.filter (
+            fun (seg1, seg2) -> 
+                BlockHelpers.overlap1D (seg1.X, seg2.X) (seg1.Y, seg2.Y)
+        )
+        |> List.length
+        // The number of distinct pairs of segments that cross each other at right angles. Does not include 0 length segments or segments on same net intersecting at one end, or segments on same net on top of each other. Count over whole sheet.
 
 
     /// idk
     let T4R = 
         () // Sum of wiring segment length, counting only one when there are N same-net segments overlapping (this is the visible wire length on the sheet). Count over whole sheet.
+        // this means that any segment that is on top of another segment is only counted once, check Nets and whatnot
 
 
     /// idk
