@@ -171,14 +171,6 @@ module HLPTick3 =
 //------------------------------functions to build issue schematics programmatically--------------------------------------//
 //------------------------------------------------------------------------------------------------------------------------//
     module Builder =
-
-
-                
-
-            
-
-
-
         /// Place a new symbol with label symLabel onto the Sheet with given position.
         /// Return error if symLabel is not unique on sheet, or if position is outside allowed sheet coordinates (0 - maxSheetCoord).
         /// To be safe place components close to (maxSheetCoord/2.0, maxSheetCoord/2.0).
@@ -484,10 +476,10 @@ module HLPTick3 =
                 ()
             | _ ->
                 func testIndex 0 dispatch
-        
+
 
 /// a module for testing of the sheetOrderFlip function for Sheet Beautification
-module TestDrawblockD2 =
+module TestDrawBlockD2 =
     open Optics
     open Optics.Operators
     open DrawModelType
@@ -516,20 +508,89 @@ module TestDrawblockD2 =
     5. repeat steps 2-4 for each of the sheet distorters
     6. repeat steps 1-5 for each of the sheet definitions
     *)
-    
 
+    /// source of random numbers
+    let random = System.Random()
+    
+    
+    /// provides details on how to generate a component to exact specifications
+    type ExactComponent = {
+        Name: string;
+        Type: ComponentType;
+        Position: XYPos;
+        Orientation: STransform;
+        // TODO: not sure how to define PortOrders and things
+    }
+
+    /// provides details on how to construct a wire to exact specifications
+    type ExactWire = {
+        Source: HLPTick3.SymbolPort;
+        Target: HLPTick3.SymbolPort;
+        Segments: Segment list;
+    }
+    
     /// a record holding all the information needed by the sheetmaker
     /// to generate a sheet,\
-    /// with some extra pre-computed information fir use in the evaluation stage
+    /// with some extra pre-computed information for use in the evaluation stage
     type SheetDefinition = {
-        Name: string  // must be unique
-        // continue defining the info that the sheetmaker function will need
+        Name: string;  // must be unique
+        Components: List<ExactComponent>;  // to exactly define a component
+        Wires: List<ExactWire>;  // manually defined wire segment lists
+        // and any further info that would help evaluation
     }
+
+    let sheetDefs: List<SheetDefinition> = [
+        {
+            Name = "ExemplarSheet1";
+            Components = [
+                {
+                    Name = "Fred";
+                    Type = DFF;
+                    Position = { X = 5.0; Y = 5.0 };
+                    Orientation = { Rotation = Degree0; Flipped = false };
+                }
+            ];
+            Wires = [
+                {
+                    Source = { Label = "yeet"; PortNumber = 0 };
+                    Target = { Label = "fred"; PortNumber = 0 };
+                    Segments = [
+
+                    ];
+                }
+            ];
+        }
+        // ... more sheet definitions
+    ]
+
+    let placeWireExact (model: SheetT.Model) (wire: ExactWire) =
+        failwithf "Not Implemented"  // TODO: Implement
+        // should probably find a way to generate those PortIDs
+        // and match the other important details
+        // either way, place the Wires, exactly as defined
 
     // TODO: probably move this up to Builders module?
     /// the sheetmaker that creates the exemplar sheet
-    let createSheet (definition: SheetDefinition) =
-        failwithf "Not Implemented"  // TODO: Implement
+    let createSheet (definition: SheetDefinition) : SheetT.Model=
+        let placeSymbols (compList: List<ExactComponent>) (model: SheetT.Model) = 
+            (model, compList)
+            ||> List.fold (  // destructure ExactComponent to access all details
+                    fun model 
+                        {Name = label; 
+                         Orientation = {Rotation = rot; Flipped = flip};
+                         Position = pos; Type = compType} -> 
+                        placeSymbol label compType pos model
+                        |> TestLib.getOkOrFail
+                        //|> // TODO: apply exactation, making sure all provided exact values are utilised
+                )
+        
+        let placeWires (wireList:List<ExactWire>) (model: SheetT.Model) = 
+            List.fold (placeWireExact) model wireList
+        
+        // TODO: see if you can change this sheet's name, too
+        DiagramMainView.init().Sheet
+        |> placeSymbols definition.Components
+        |> placeWires definition.Wires
 
 
     // TODO: maybe move this to above Asserts module?
@@ -659,11 +720,19 @@ module TestDrawblockD2 =
         let evaluateBeautification (exemplar: SheetDefinition) (sheet: SheetT.Model) =
             failwithf "Not Implemented"  // TODO: Implement
 
+
         let wireCrossingsCount = ()  // TODO: grab from SBHelpers
 
         let wireUsage = ()  // TODO: grab from SBHelpers
 
         let wireSymbolSpacing (exemplar: SheetDefinition) (sheet: SheetT.Model) =
             failwithf "Not Implemented"  // TODO: implement 
+
+
+        /// goes through all symbols, marking their orientations.\
+        /// default orientation is best, logic gates have fewer marks deducted
+        /// for rotation and flipping than other components
+        let orientationMarker (sheet: SheetT.Model) =
+            failwithf "Not Implemented"  // TODO: implement
 
 
