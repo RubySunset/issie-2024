@@ -129,6 +129,9 @@ module HLPTick3 =
     // visibleSegments is included here as ahelper for info, and because it is needed in project work
     //-----------------------------------------------------------------------------------------------
 
+    /// helper to match even and off integers in patterns (active pattern)
+    let (|IsEven|IsOdd|) (n: int) = match n % 2 with | 0 -> IsEven | _ -> IsOdd
+
     /// The visible segments of a wire, as a list of vectors, from source end to target end.
     /// Note that in a wire with n segments a zero length (invisible) segment at any index [1..n-2] is allowed 
     /// which if present causes the two segments on either side of it to coalesce into a single visible segment.
@@ -136,9 +139,6 @@ module HLPTick3 =
     let visibleSegments (wId: ConnectionId) (model: SheetT.Model): XYPos list =
 
         let wire = model.Wire.Wires[wId] // get wire from model
-
-        /// helper to match even and off integers in patterns (active pattern)
-        let (|IsEven|IsOdd|) (n: int) = match n % 2 with | 0 -> IsEven | _ -> IsOdd
 
         /// Convert seg into its XY Vector (from start to end of segment).
         /// index must be the index of seg in its containing wire.
@@ -488,7 +488,14 @@ module HLPTick3 =
 
 /// a module for testing of the sheetOrderFlip function for Sheet Beautification
 module TestDrawblockD2 =
+    open Optics
+    open Optics.Operators
     open DrawModelType
+    open BusWireT
+    open CommonTypes
+    open HLPTick3
+    open HLPTick3.Builder
+    open SheetBeautifyHelpers
     (* Design:
     
     - 3 sheet definitions, each hardcoded according to our specifications
@@ -536,20 +543,74 @@ module TestDrawblockD2 =
         // but no need to alter position or scales of symbols
         // can merge with work of D1 for that
 
+        /// generates a list of `number` indices with values from 0 to max\
+        /// the indices are all unique and random
+        let generateUniqueIndices (max: int) (number: int) =
+            if max < number 
+            then failwithf "can't generate more unique indices than max"
+            // ^ this is a user error and should be called out
+
+            let randList = toList (randomInt 0 1 max)
+            
+            if max = number
+            then randList  // all possible indices in range, shuffled
+            else List.take number randList
+            // ^ take the first `number` indices from the shuffled list
+        
+        // TODO: check that rotation and flipping can be safely applied
+        // directly to symbols
+
         /// rotates a symbol to a random orientation
-        let rotateSymbol (symbol: SymbolT.Model) =
-            failwithf "Not Implemented"  // TODO: Implement
+        let rotateSymbol (symbol: SymbolT.Symbol) =
+            let rotation =
+                match random.Next() % 4 with
+                | 0 -> Degree0
+                | 1 -> Degree90
+                | 2 -> Degree180
+                | 3 -> Degree270
+                | _ -> Degree0  // this shouldn't happen
+            SymbolResizeHelpers.rotateSymbol rotation symbol
 
         /// flips a symbol to a random orientation
-        let flipSymbol (symbol: SymbolT.Model) =
-            failwithf "Not Implemented"  // TODO: Implement
+        let flipSymbol (symbol: SymbolT.Symbol) =
+            let orientation =  // TODO: should I expand to % 3, to include none?
+                match random.Next() with
+                | IsEven -> SymbolT.FlipHorizontal
+                | IsOdd -> SymbolT.FlipVertical
+            SymbolResizeHelpers.flipSymbol orientation symbol
 
         /// combines the rotate and flip functions
         /// to rotate and flip `number` symbols
         let rotateAndFlipSymbols (model: SheetT.Model) (number: int) =
-            failwithf "Not Implemented"  // TODO: Implement
+            let symbolMap = Optic.get SheetT.symbols_ model
+            
+            /// gets `number` Symbols from `model`
+            let getRandomSymbols =
+                let randomIdxs = 
+                    generateUniqueIndices (Map.count symbolMap) number
+
+                symbolMap
+                |> Map.toList
+                |> fun symList -> 
+                    List.map (fun idx -> symList[idx]) randomIdxs
+            
+            /// applies a random rotation and flip to the symbol
+            let rotateFlipper (symbol: SymbolT.Symbol) =
+                symbol
+                |> rotateSymbol
+                |> flipSymbol
+            
+            getRandomSymbols
+            |> List.map (fun (compId, symbol) -> (compId, rotateFlipper symbol))
+            |> List.fold (
+                fun symMap (compId, symbol) -> 
+                    Map.add compId symbol symMap
+            ) symbolMap
+            |> fun symList -> Optic.set SheetT.symbols_ symList model
 
 
+        // TODO: consider both input and output ports, do them together or separate???
+        
         /// randomly picks two ports on a symbol and switches their order\
         /// obviously switches if the symbol has only two ports
         let switchPortOrder (symbol: SymbolT.Symbol) =
@@ -565,6 +626,7 @@ module TestDrawblockD2 =
         /// to yield a fully randomised port edge
         let randomisePortOrder (symbol: SymbolT.Symbol) =
             failwithf "Not Implemented"  // TODO: Implement
+            // TODO: use GenerateData's shuffle thing :)
 
         /// randomly picks `number` symbols and randomises their ports' orders
         let portMesserUpper (model: SheetT.Model) (number: int) =
