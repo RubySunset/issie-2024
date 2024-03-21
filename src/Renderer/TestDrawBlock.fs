@@ -652,8 +652,7 @@ module TestDrawBlockD2 =
 
                 symbolMap
                 |> Map.toList
-                |> fun symList -> 
-                    List.map (fun idx -> symList[idx]) randomIdxs
+                |> fun symList -> List.map (fun idx -> symList[idx]) randomIdxs
             
             /// applies a random rotation and flip to the symbol
             let rotateFlipper (symbol: SymbolT.Symbol) =
@@ -671,16 +670,19 @@ module TestDrawBlockD2 =
 
 
         // TODO: consider both input and output ports, do them together or separate???
-        
+
         /// randomly picks two ports on a symbol and switches their order\
         /// obviously switches if the symbol has only two ports
         let switchPortOrder (symbol: SymbolT.Symbol) =
             failwithf "Not Implemented"  // TODO: Implement
             // for MUX2, make use of lens defined in SBHelpers
+            // 1. number of ports check
+            // 2. use generateUniqueIndices to get 2 values and switch
 
         /// randomly picks `number` symbols and switches their ports' orders
         let switchPortOrders (model: SheetT.Model) (number: int) =
             failwithf "Not Implemented"  // TODO: Implement
+            // Do I need this one? it just calls switchPortOrder, right?
 
         /// effective on many-port symbols, where a list can be generated,
         /// randomised, and then applied\
@@ -688,10 +690,12 @@ module TestDrawBlockD2 =
         let randomisePortOrder (symbol: SymbolT.Symbol) =
             failwithf "Not Implemented"  // TODO: Implement
             // TODO: use GenerateData's shuffle thing :)
+            // basically same as above, just using generateUniqueIndices
 
         /// randomly picks `number` symbols and randomises their ports' orders
         let portMesserUpper (model: SheetT.Model) (number: int) =
             failwithf "Not Implemented"  // TODO: Implement
+            // you get the idea :)
 
     
     /// a module to evaluate the performance of the beautification function\
