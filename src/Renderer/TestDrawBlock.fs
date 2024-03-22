@@ -795,6 +795,72 @@ module TestDrawBlockD2 =
                   to yield a sweet spot for symbol orientation and port order
         *)
 
+        /// Sheet evaluation metric hyperparameters
+        type SheetEvalParamT = {
+            WireCrossingsNorm: float;
+            VisibleLengthNorm: float;
+            RightAnglesNorm: float;
+            RetracedSegsNorm: float;
+            SegSymIntersectNorm: float;
+        }
+
+        let SheetEvalParam = {
+            WireCrossingsNorm = 250_000.0;
+            VisibleLengthNorm = 1.0;
+            RightAnglesNorm = 15_000.0;
+            RetracedSegsNorm = 1_000_000.0;
+            SegSymIntersectNorm = 1_500_000.0;
+        }
+
+        /// Returns the score of a sheet.
+        let evaluateSheet
+                (sheet: SheetT.Model)
+                : float =
+
+            let wireCrossingsSq = float (SheetBeautifyHelpers2.numRightAngleSegCrossings sheet) ** 2.0
+            let visibleLengthSq = float (SheetBeautifyHelpers2.visibleWireLength sheet) ** 2.0
+            let rightAnglesSq = float (SheetBeautifyHelpers2.numWireRightAngles sheet) ** 2.0
+            let retracedSegsSq = float (SheetBeautifyD2.numRetracedSegs sheet) ** 2.0
+            let segSymIntersectSq = float (SheetBeautifyD2.numSymsIntersectedBySeg sheet) ** 2.0
+
+            wireCrossingsSq * SheetEvalParam.WireCrossingsNorm +
+            visibleLengthSq * SheetEvalParam.VisibleLengthNorm +
+            rightAnglesSq * SheetEvalParam.RightAnglesNorm +
+            retracedSegsSq * SheetEvalParam.RetracedSegsNorm +
+            segSymIntersectSq * SheetEvalParam.SegSymIntersectNorm
+
+        /// Returns a pair of scores for a sheet before and after beautification.
+        let evaluateBeforeAndAfter
+                (sheetBefore: SheetT.Model)
+                (sheetAfter: SheetT.Model)
+                : (float * float) =
+            evaluateSheet sheetBefore, evaluateSheet sheetAfter
+
+        /// Print all results.
+        let printAllResults
+                (result: (float * float) list)
+                : unit =
+            result
+            |> List.map (fun (before, after) ->
+                let diff = (before - after)/before * 100.
+                printf "Score before = %.2e, Score after = %.2e, Improvement = %.1f%%" before after diff
+            )
+            |> fun _ -> () // Return unit
+            
+        /// Print aggregated results.
+        let printAggregatedResults
+                (results: (float * float) list)
+                : unit =
+            let scoreDiffRel =
+                results
+                |> List.map (fun (before, after) -> (before - after)/before * 100.)
+            printf "Relative metrics:"
+            printf "Min score improvement = %.1f%%" <| List.min scoreDiffRel
+            printf "Max score improvement = %.1f%%" <| List.max scoreDiffRel
+            printf "Average score improvement = %.1f%%" <| List.average scoreDiffRel
+
+
+
         let wireCrossingsCount = ()  // TODO: grab from SBHelpers
 
         let wireUsage = ()  // TODO: grab from SBHelpers
