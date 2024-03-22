@@ -775,7 +775,8 @@ module TestDrawBlockD2 =
 
     /// a module to evaluate the performance of the beautification function\
     /// for the samples that fail the initial tests, 
-    /// we can still evaluate how close they came to their target
+    /// we can still evaluate how close they came to their target\
+    /// (majority of code, courtesy of Roshan)
     module Evaluate =
         (* Criteria:
             Primarily checking for Wire Crossings
@@ -786,6 +787,12 @@ module TestDrawBlockD2 =
                   with a little tolerance, of course
                 - a symbol in a suboptimal orientation will use more wire
                   than a symbol in an optimal orientation
+            - Symbol Orientation
+                - some symbol orientations are better than others
+                - for most symbols, the default orientation is the best
+                - logic gates are more forgiven in other orientations
+                - for most symbol the 180 degree rotation is the worst
+            // dropped implementation of this, because it's too complex for this
             - Wire-Symbol spacing
                 - the distance between a wire and any given symbol
                   affects how cluttered that area of the sheet looks
@@ -794,6 +801,14 @@ module TestDrawBlockD2 =
                 - of course, this must be balanced with Wire Usage
                   to yield a sweet spot for symbol orientation and port order
         *)
+
+        // TODO: implement this, into pipeline
+        /// goes through all symbols, marking their orientations.\
+        /// default orientation is best, logic gates have fewer marks deducted
+        /// for rotation and flipping than other components
+        let orientationMarker (sheet: SheetT.Model) =
+            failwithf "Not Implemented"  // TODO: implement
+
 
         /// Sheet evaluation metric hyperparameters
         type SheetEvalParamT = {
@@ -836,6 +851,7 @@ module TestDrawBlockD2 =
                 : (float * float) =
             evaluateSheet sheetBefore, evaluateSheet sheetAfter
 
+
         /// Print all results.
         let printAllResults
                 (result: (float * float) list)
@@ -860,21 +876,15 @@ module TestDrawBlockD2 =
             printf "Average score improvement = %.1f%%" <| List.average scoreDiffRel
 
 
-
-        let wireCrossingsCount = ()  // TODO: grab from SBHelpers
-
-        let wireUsage = ()  // TODO: grab from SBHelpers
-
-        let wireSymbolSpacing (exemplar: SheetDefinition) (sheet: SheetT.Model) =
-            failwithf "Not Implemented"  // TODO: implement 
-
-
-        /// goes through all symbols, marking their orientations.\
-        /// default orientation is best, logic gates have fewer marks deducted
-        /// for rotation and flipping than other components
-        let orientationMarker (sheet: SheetT.Model) =
-            failwithf "Not Implemented"  // TODO: implement
-
-        /// overall evaluation function to be called
-        let evaluateBeautification (exemplar: SheetDefinition) (sheet: SheetT.Model) =
-            failwithf "Not Implemented"  // TODO: Implement
+        /// The main function that evaluates the performance
+        /// of the beautification function,\
+        /// by aggregating the results of lots of different metrics
+        let Jury (exemplars: List<SheetT.Model>) 
+                 (sheetsUnderTest: List<SheetT.Model>) =
+            List.zip exemplars sheetsUnderTest
+            |> List.map (fun (exemplar, sheetUnderTest) ->
+                evaluateBeforeAndAfter exemplar sheetUnderTest
+            )
+            |> fun results -> 
+                printAllResults results
+                printAggregatedResults results
