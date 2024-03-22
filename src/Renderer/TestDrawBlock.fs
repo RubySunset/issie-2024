@@ -523,10 +523,9 @@ module TestDrawBlockD2 =
     }
 
     /// provides details on how to construct a wire to exact specifications
-    type ExactWire = {
+    type SimpleWire = {
         Source: HLPTick3.SymbolPort;
         Target: HLPTick3.SymbolPort;
-        Segments: Segment list;
     }
     
     /// a record holding all the information needed by the sheetmaker
@@ -535,7 +534,7 @@ module TestDrawBlockD2 =
     type SheetDefinition = {
         Name: string;  // must be unique
         Components: List<ExactComponent>;  // to exactly define a component
-        Wires: List<ExactWire>;  // manually defined wire segment lists
+        Wires: List<SimpleWire>;  // manually defined wire segment lists
         // and any further info that would help evaluation
     }
 
@@ -544,7 +543,7 @@ module TestDrawBlockD2 =
             Name = "ExemplarSheet1";
             Components = [
                 {
-                    Name = "Fred";
+                    Name = "Fred";  // should be unique
                     Type = DFF;
                     Position = { X = 5.0; Y = 5.0 };
                     Orientation = { Rotation = Degree0; Flipped = false };
@@ -553,21 +552,20 @@ module TestDrawBlockD2 =
             Wires = [
                 {
                     Source = { Label = "yeet"; PortNumber = 0 };
-                    Target = { Label = "fred"; PortNumber = 0 };
-                    Segments = [
-
-                    ];
+                    Target = { Label = "Fred"; PortNumber = 0 };
                 }
             ];
         }
         // ... more sheet definitions
     ]
 
-    let placeWireExact (model: SheetT.Model) (wire: ExactWire) =
-        failwithf "Not Implemented"  // TODO: Implement
-        // should probably find a way to generate those PortIDs
-        // and match the other important details
-        // either way, place the Wires, exactly as defined
+    /// essentially a wrapper for `placeWire` that makes it easier to use
+    /// in a `List.fold`
+    let placeSimpleWire (model: SheetT.Model) (wire: SimpleWire) =
+        placeWire wire.Source wire.Target model
+        |> TestLib.getOkOrFail
+        // ^ unwraps results, 
+        // issues here would be issues in my hard-coded sheet definitions
 
     // TODO: probably move this up to Builders module?
     /// the sheetmaker that creates the exemplar sheet
@@ -584,8 +582,8 @@ module TestDrawBlockD2 =
                         //|> // TODO: apply exactation, making sure all provided exact values are utilised
                 )
         
-        let placeWires (wireList:List<ExactWire>) (model: SheetT.Model) = 
-            List.fold (placeWireExact) model wireList
+        let placeWires (wireList:List<SimpleWire>) (model: SheetT.Model) = 
+            List.fold (placeSimpleWire) model wireList
         
         // TODO: see if you can change this sheet's name, too
         DiagramMainView.init().Sheet
@@ -604,24 +602,76 @@ module TestDrawBlockD2 =
         // but no need to alter position or scales of symbols
         // can merge with work of D1 for that
 
-        /// generates a list of `number` indices with values from 0 to max\
+        /// locally overloads a CommonTypes lens, with a more useful lens 
+        /// (in this context)
+        let portOrder_ = SymbolT.portMaps_ >-> SymbolT.order_
+
+        /// generates a list of {`number`} indices with values from 
+        /// 0 (inclusive) to max (non-inclusive)\
         /// the indices are all unique and random
         let generateUniqueIndices (max: int) (number: int) =
-            if max < number 
+            let max = max - 1  // to make it 0-indexed
+
+            if number > max
             then failwithf "can't generate more unique indices than max"
             // ^ this is a user error and should be called out
 
             let randList = toList (randomInt 0 1 max)
             
-            if max = number
+            if number = max
             then randList  // all possible indices in range, shuffled
             else List.take number randList
             // ^ take the first `number` indices from the shuffled list
+
+
+        /// gets `number` Symbols from `model`
+        let getRandomSymbols (number: int) 
+                             (symbolMap: Map<ComponentId, SymbolT.Symbol>) =
+            let randomIdxs = 
+                generateUniqueIndices (Map.count symbolMap) number
+
+            symbolMap
+            |> Map.toList
+            |> fun symList -> List.map (fun idx -> symList[idx]) randomIdxs
+
         
+        // TODO: add a check somewhere, to ensure that `number` < comp_count
+        // could clip/cap at comp_count? since multiple idempotent distortions
+        // (all my distortions) equate to just one distortion, anyways
+
+        /// applies the provided distortion to {`number`} random symbols 
+        /// in the provided sheet,\
+        /// where `number` < number of components in sheet
+        let setRandomSymbols (model: SheetT.Model) (number: int) 
+                             (distorter: SymbolT.Symbol -> SymbolT.Symbol)=
+            let symbolMap = Optic.get SheetT.symbols_ model
+            
+            symbolMap
+            |> getRandomSymbols number
+            |> List.map (fun (compId, symbol) -> (compId, distorter symbol))
+            |> List.fold (
+                fun symMap (compId, symbol) -> 
+                    Map.add compId symbol symMap
+            ) symbolMap
+            |> fun symList -> Optic.set SheetT.symbols_ symList model
+        
+
+        /// picks a random, existing edge, to target for port order distortions
+        let getRandomEdge (portOrder: Map<Edge, string list>) = 
+            portOrder.Keys
+                |> Seq.toList
+                |> fun edgeList ->  // picks a random edge that has ports
+                    generateUniqueIndices edgeList.Length 1
+                    |> function | [idx] -> idx
+                                | _ -> 0  // this shouldn't happen
+                    |> fun targetIndex -> edgeList[targetIndex]
+
+
         // TODO: check that rotation and flipping can be safely applied
         // directly to symbols
 
-        /// rotates a symbol to a random orientation
+        /// rotates a symbol to a random orientation\
+        /// (helper for `rotateAndFlipSymbols`)
         let rotateSymbol (symbol: SymbolT.Symbol) =
             let rotation =
                 match random.Next() % 4 with
@@ -632,7 +682,8 @@ module TestDrawBlockD2 =
                 | _ -> Degree0  // this shouldn't happen
             SymbolResizeHelpers.rotateSymbol rotation symbol
 
-        /// flips a symbol to a random orientation
+        /// flips a symbol to a random orientation\
+        /// (helper for `rotateAndFlipSymbols`)
         let flipSymbol (symbol: SymbolT.Symbol) =
             let orientation =  // TODO: should I expand to % 3, to include none?
                 match random.Next() with
@@ -643,61 +694,85 @@ module TestDrawBlockD2 =
         /// combines the rotate and flip functions
         /// to rotate and flip `number` symbols
         let rotateAndFlipSymbols (model: SheetT.Model) (number: int) =
-            let symbolMap = Optic.get SheetT.symbols_ model
-            
-            /// gets `number` Symbols from `model`
-            let getRandomSymbols =
-                let randomIdxs = 
-                    generateUniqueIndices (Map.count symbolMap) number
-
-                symbolMap
-                |> Map.toList
-                |> fun symList -> List.map (fun idx -> symList[idx]) randomIdxs
-            
             /// applies a random rotation and flip to the symbol
             let rotateFlipper (symbol: SymbolT.Symbol) =
                 symbol
                 |> rotateSymbol
                 |> flipSymbol
             
-            getRandomSymbols
-            |> List.map (fun (compId, symbol) -> (compId, rotateFlipper symbol))
-            |> List.fold (
-                fun symMap (compId, symbol) -> 
-                    Map.add compId symbol symMap
-            ) symbolMap
-            |> fun symList -> Optic.set SheetT.symbols_ symList model
+            setRandomSymbols model number rotateFlipper
+        
 
+        /// a gatekeeping function that just reverses the port order
+        /// if the symbol is a MUX, because MUXs are special...\
+        /// and applies the desired distorter, otherwise\
+        /// (helper for `switchPortOrders` and `portMesserUpper`)
+        let portDistort (portDistorter: SymbolT.Symbol -> SymbolT.Symbol) 
+                        (symbol: SymbolT.Symbol) =
+            match symbol.ReversedInputPorts with
+            | Some reversed ->  // is a mux-type symbol
+                Optic.set reversedInputPorts_ (Some (not reversed)) symbol
+            | None -> portDistorter symbol
 
-        // TODO: consider both input and output ports, do them together or separate???
 
         /// randomly picks two ports on a symbol and switches their order\
-        /// obviously switches if the symbol has only two ports
+        /// obviously switches if the symbol has only two ports\
+        /// (helper for `switchPortOrders`)
         let switchPortOrder (symbol: SymbolT.Symbol) =
-            failwithf "Not Implemented"  // TODO: Implement
-            // for MUX2, make use of lens defined in SBHelpers
-            // 1. number of ports check
-            // 2. use generateUniqueIndices to get 2 values and switch
+            let portOrder = Optic.get portOrder_ symbol
+            
+            let targetEdge = getRandomEdge portOrder
 
+            portOrder
+            |> Map.find targetEdge  // key obtained above, so it's valid
+            |> fun portList ->
+                let portIndices = generateUniqueIndices portList.Length 2
+                
+                // switches the two ports
+                List.mapi (fun idx portId ->  // TODO: still work with 1 port?
+                    match idx with
+                    | i when i = portIndices[0] -> portList[portIndices[1]]
+                    | i when i = portIndices[1] -> portList[portIndices[0]]
+                    | _ -> portId
+                ) portList 
+            |> fun newPortList ->  // update target edge's port list in symbol
+                (Map.add targetEdge newPortList portOrder, symbol)
+                ||> Optic.set portOrder_ 
+                // TODO: not sure if this `||>` makes it more readable or not
+            
         /// randomly picks `number` symbols and switches their ports' orders
         let switchPortOrders (model: SheetT.Model) (number: int) =
-            failwithf "Not Implemented"  // TODO: Implement
-            // Do I need this one? it just calls switchPortOrder, right?
+            // TODO: this is kinda ugly, though
+            // reformulate this gatekeeping behaviour?
+            portDistort switchPortOrder
+            |> setRandomSymbols model number
+
 
         /// effective on many-port symbols, where a list can be generated,
         /// randomised, and then applied\
-        /// to yield a fully randomised port edge
+        /// to yield a fully randomised port edge\\
+        /// helper for `portMesserUpper`
         let randomisePortOrder (symbol: SymbolT.Symbol) =
-            failwithf "Not Implemented"  // TODO: Implement
-            // TODO: use GenerateData's shuffle thing :)
-            // basically same as above, just using generateUniqueIndices
+            let portOrder = Optic.get portOrder_ symbol
+            
+            let targetEdge = getRandomEdge portOrder
 
+            portOrder
+            |> Map.find targetEdge
+            |> fun portList ->
+                generateUniqueIndices portList.Length portList.Length
+                |> List.map (fun idx -> portList[idx])
+            |> fun newPortList ->  // update target edge's port list in symbol
+                (Map.add targetEdge newPortList portOrder, symbol)
+                ||> Optic.set portOrder_ 
+            // TODO: check implementation
+        
         /// randomly picks `number` symbols and randomises their ports' orders
         let portMesserUpper (model: SheetT.Model) (number: int) =
-            failwithf "Not Implemented"  // TODO: Implement
-            // you get the idea :)
+            portDistort randomisePortOrder
+            |> setRandomSymbols model number 
 
-    
+
     /// a module to evaluate the performance of the beautification function\
     /// for the samples that fail the initial tests, 
     /// we can still evaluate how close they came to their target
@@ -720,11 +795,6 @@ module TestDrawBlockD2 =
                   to yield a sweet spot for symbol orientation and port order
         *)
 
-        /// overall evaluation function to be called
-        let evaluateBeautification (exemplar: SheetDefinition) (sheet: SheetT.Model) =
-            failwithf "Not Implemented"  // TODO: Implement
-
-
         let wireCrossingsCount = ()  // TODO: grab from SBHelpers
 
         let wireUsage = ()  // TODO: grab from SBHelpers
@@ -739,4 +809,6 @@ module TestDrawBlockD2 =
         let orientationMarker (sheet: SheetT.Model) =
             failwithf "Not Implemented"  // TODO: implement
 
-
+        /// overall evaluation function to be called
+        let evaluateBeautification (exemplar: SheetDefinition) (sheet: SheetT.Model) =
+            failwithf "Not Implemented"  // TODO: Implement
