@@ -1081,5 +1081,3 @@ module TestDrawBlockD2 =
                 (distortionLevels, sheetOrderFlip)
             | _ -> failwithf "for other tests"
             ||> Executioner dispatch
-            
-    // TODO: push asap, git commit -m "plan execution pipelining"
