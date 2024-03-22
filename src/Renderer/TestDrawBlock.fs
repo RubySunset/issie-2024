@@ -745,7 +745,7 @@ module TestDrawBlockD2 =
             portOrder.Keys
                 |> Seq.toList
                 |> fun edgeList ->  // picks a random edge that has ports
-                    random.Next() % edgeList.length
+                    random.Next() % edgeList.Length
                     |> fun targetIndex -> edgeList[targetIndex]
 
 
