@@ -270,7 +270,6 @@ module HLPTick3 =
 
         // Applies Beautify to the sheet and displays it in issie
         let applyBeautify beautifyFunc (dispatch: Dispatch<Msg>) (model: ModelType.Model) =
-            printfn ""
             dispatch <| UpdateDrawBlockTestState(fun _ -> Some {LastTestNumber=0; LastTestSampleIndex=0})
             let sheet = Optic.get sheet_ model
             sheet
@@ -317,7 +316,7 @@ module HLPTick3 =
             | (n,first):: _ -> // display in Issie editor and print out first error
                 printf $"Test {result.TestName} has FAILED on sample {n} with error message:\n{first}"
                 match catchException "" sheetMaker (samples.Data n) with
-                | Ok sheet -> showSheetInIssieSchematic sheet dispatch
+                | Ok sheet -> showSheetInIssieSchematic dispatch sheet 
                 | Error mess -> ()
             result
 //--------------------------------------------------------------------------------------------------//
@@ -618,7 +617,7 @@ module TestDrawBlockD2 =
         // and any further info that would help evaluation
     }
 
-    let sheetDefs: List<SheetDefinition> = [
+    let sheetDefinitions: List<SheetDefinition> = [
         {
             Name = "ExemplarSheet1";
             Components = [
@@ -639,15 +638,14 @@ module TestDrawBlockD2 =
         // ... more sheet definitions
     ]
 
+
     /// essentially a wrapper for `placeWire` that makes it easier to use
     /// in a `List.fold`
     let placeSimpleWire (model: SheetT.Model) (wire: SimpleWire) =
         placeWire wire.Source wire.Target model
         |> TestLib.getOkOrFail
-        // ^ unwraps results, 
-        // issues here would be issues in my hard-coded sheet definitions
+        // ^ unwraps results: any Fail would be a sheet definition error
 
-    // TODO: probably move this up to Builders module?
     /// the sheetmaker that creates the exemplar sheet
     let createSheet (definition: SheetDefinition) : SheetT.Model=
         let placeSymbols (compList: List<ExactComponent>) (model: SheetT.Model) = 
@@ -671,20 +669,26 @@ module TestDrawBlockD2 =
         |> placeWires definition.Wires
 
 
-    // TODO: maybe move this to above Asserts module?
-    /// the sheetchecker that compares the beautified sheet against the exemplar
-    let practicallyEquivalent (sample: int) (sheet: SheetT.Model) =
-        failwithf "Not Implemented"  // TODO: Implement
-
-
     module Distort =
         // rotate, flip, alter port order
         // but no need to alter position or scales of symbols
         // can merge with work of D1 for that
 
+
         /// locally overloads a CommonTypes lens, with a more useful lens 
         /// (in this context)
         let portOrder_ = SymbolT.portMaps_ >-> SymbolT.order_
+
+
+        /// defines a distortion test-set to be applied to a sheet
+        type DistorterTest = {
+            // something like "Easy, Medium, Hard, etc."
+            Name: string;
+            // a function that applies a series of distortions to a sheet
+            // they can be chained, since they're designed to be independent
+            Distorter: SheetT.Model -> SheetT.Model;
+        }  // hard-coded list defined at end of `Distort` module
+
 
         /// generates a list of {`number`} indices with values from 
         /// 0 (inclusive) to max (non-inclusive)\
@@ -830,8 +834,8 @@ module TestDrawBlockD2 =
 
         /// effective on many-port symbols, where a list can be generated,
         /// randomised, and then applied\
-        /// to yield a fully randomised port edge\\
-        /// helper for `portMesserUpper`
+        /// to yield a fully randomised port edge\
+        /// (helper for `portMesserUpper`)
         let randomisePortOrder (symbol: SymbolT.Symbol) =
             let portOrder = Optic.get portOrder_ symbol
             
@@ -853,6 +857,32 @@ module TestDrawBlockD2 =
             |> setRandomSymbols model number 
 
 
+        /// a list of tests to be applied by Executioner
+        let distortionLevels: List<DistorterTest> = [
+            {
+                Name = "Easy";
+                Distorter = 
+                    let fred = 5
+                    fun john -> john
+                    // TODO: create distortion chain
+            };
+            {
+                Name = "Medium";
+                Distorter = 
+                    let fred = 5
+                    fun john -> john
+                    // TODO: create distortion chain
+            };
+            {
+                Name = "Hard";
+                Distorter = 
+                    let fred = 5
+                    fun john -> john
+                    // TODO: create distortion chain
+            }
+        ]
+
+
     /// a module to evaluate the performance of the beautification function\
     /// for the samples that fail the initial tests, 
     /// we can still evaluate how close they came to their target\
@@ -872,7 +902,7 @@ module TestDrawBlockD2 =
                 - for most symbols, the default orientation is the best
                 - logic gates are more forgiven in other orientations
                 - for most symbol the 180 degree rotation is the worst
-            // dropped implementation of this, because it's too complex for this
+            // dropped spacing checks, because it's too complex for this
             - Wire-Symbol spacing
                 - the distance between a wire and any given symbol
                   affects how cluttered that area of the sheet looks
@@ -960,11 +990,98 @@ module TestDrawBlockD2 =
         /// of the beautification function,\
         /// by aggregating the results of lots of different metrics
         let Jury (exemplars: List<SheetT.Model>) 
-                 (sheetsUnderTest: List<SheetT.Model>) =
-            List.zip exemplars sheetsUnderTest
-            |> List.map (fun (exemplar, sheetUnderTest) ->
-                evaluateBeforeAndAfter exemplar sheetUnderTest
+                 (sheetsUnderTest: List<SheetT.Model> list) =
+            // match the 2D `sheetsUnderTest` lists to its exemplar counterpart
+            (exemplars, sheetsUnderTest)
+            ||> List.map2 (
+                fun exemplar levelsUnderTest ->
+                    List.collect (
+                        fun levelUnderTest -> 
+                            [evaluateBeforeAndAfter exemplar levelUnderTest]
+                    ) levelsUnderTest
             )
+            |> List.concat
             |> fun results -> 
-                printAllResults results
+                printAllResults results;
                 printAggregatedResults results
+
+
+        // NOT IMPLEMENTING JUDGE, for lack of time :(
+        
+        /// disassembles a sheet into a sheet definition
+        let disassembleSheet (sheet: SheetT.Model) : SheetDefinition =
+            failwithf "Not Implemented"  // TODO: implement
+        
+        /// the sheetchecker that compares the beautified sheet 
+        /// against the exemplar
+        let practicallyEquivalent (exemplar: SheetDefinition) 
+                                  (sheetUnderTest: SheetT.Model) =
+            (*
+            1. Use disassembleSheet to strip the sheetUnderTest down
+            2. Compare the two SD's, based on change-able parameters
+                - Port Orderings <- Wire port numbers
+                - Symbol Orientation
+            *)
+            failwithf "Not Implemented"  // TODO: Implement
+
+        /// performs a holistic judgement of how close the produced sheet is 
+        /// to the original exemplar sheet's definition
+        let Judge (exemplars: List<SheetDefinition>) 
+                  (sheetsUnderTest: List<SheetT.Model>) =
+            List.zip exemplars sheetsUnderTest
+            |> List.map (
+                fun (exemplar, sheetUnderTest) -> 
+                    practicallyEquivalent exemplar sheetUnderTest
+            )
+
+    
+    /// executes the building and testing pipeline for the whole D2 block
+    module Execute =
+        open SheetBeautifyD2
+        open Distort
+        open Evaluate
+
+        
+        // TODO: `showSheetInIssieSchematic` as a blocking, pipelined operation
+        // this should allow us to see the testifying process,\
+        // since beautification is a visual and subjective art
+        // ^ so, the visual aspect is also important for testing
+        /// the top-level, pipeline-execution function:\
+        /// creates sheets, distorts them, beautifies them, and then evaluates
+        let Executioner (dispatch: Dispatch<Msg>) 
+                        (distortionTests: List<DistorterTest>) 
+                        (beautifyFunction) =
+            /// local name, to allow for easier swapping
+            let sheetDefs = sheetDefinitions
+            
+            // these exemplar sheets don't have to be fixed
+            let exemplarSheets = List.map createSheet sheetDefs
+
+            exemplarSheets
+            |> List.map (fun sheet ->  // for each defined sheet
+                List.map (
+                    fun distortionTest -> // for each distortion level
+                        // printf $"Applying {distortionTests.Name} test"?
+                        // TODO: oops, sheet naming not yet implemented
+                        distortionTest.Distorter sheet
+                ) distortionTests
+            )
+            |> List.map (List.map (beautifyFunction))
+            |> Jury exemplarSheets  // all results will be printed
+            // ^ TODO: when Judge implemented, have Judge be called first and
+            // get print it's results, returning the SUT's, unharmed, for Jury
+
+
+        /// redefinition to replace one in HLPTick3 module,
+        /// since that's the one called by `Renderer`\
+        /// Ideally, the other tests would be added here, 
+        /// so that they can be run via the hotkeys
+        let testMenuFunc (testIndex: int) (dispatch: Dispatch<Msg>) (model: Model) =
+            match testIndex with
+            | 2 -> 
+                printf "Running D2 Test"
+                (distortionLevels, sheetOrderFlip)
+            | _ -> failwithf "for other tests"
+            ||> Executioner dispatch
+            
+    // TODO: push asap, git commit -m "plan execution pipelining"
